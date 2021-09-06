@@ -1,14 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using MongoDbAccessor;
+using Newtonsoft.Json;
 
 namespace MongoLinqs
 {
-
-    
     public class MongoQueryProvider : IQueryProvider
     {
         public IQueryable CreateQuery(Expression expression)
@@ -28,7 +30,64 @@ namespace MongoLinqs
 
         public TResult Execute<TResult>(Expression expression)
         {
-            throw new NotImplementedException();
+            if (typeof(TResult).GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            {
+                var elementType = typeof(TResult).GenericTypeArguments.First();
+                var pipelineGenerator = new MongoPipelineGenerator();
+                pipelineGenerator.Visit(expression);
+                var collection = GetCollection(elementType.Name);
+                var stages = BsonSerializer
+                    .Deserialize<BsonArray>(pipelineGenerator.Build())
+                    .Select(item => (BsonDocument) item);
+  
+                var pipelineDefinition =  PipelineDefinition<BsonDocument, BsonDocument>.Create(stages);
+                var result = collection.Aggregate(pipelineDefinition).ToList();
+               
+                return (TResult)Deserialize(elementType, result);
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        private object Deserialize(Type elementType, List<BsonDocument> documents)
+        {
+            var method = typeof(MongoQueryProvider).GetMethod(nameof(DeserializeCore),
+                BindingFlags.Instance | BindingFlags.NonPublic );
+            return method!.MakeGenericMethod(elementType).Invoke(this, new object[] {documents});
+        }
+        
+        private IEnumerable<TElement> DeserializeCore<TElement>( List<BsonDocument> documents)
+        {
+            foreach (var document in documents)
+            {
+                if (document.Contains("_id"))
+                {
+                    var idValue = document["_id"];
+                    document.Remove("_id");
+                    document["id"] = idValue;
+                }
+
+                var json = document.ToString();
+                yield return JsonConvert.DeserializeObject<TElement>(json);
+            }
+            
+            
+        }
+
+        private string ToFieldName(string propertyName)
+        {
+            var fieldName = ToCamelCase(propertyName);
+            if (fieldName == "id") return "_id";
+            return fieldName;
+        }
+
+        private string ToCamelCase(string s)
+        {
+            if (s == null) return null;
+            if (s == string.Empty) return s;
+            return s.Substring(0, 1).ToLower() + s.Substring(1);
         }
 
         private IMongoCollection<BsonDocument> GetCollection(string collectionName)
