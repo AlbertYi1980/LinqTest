@@ -76,20 +76,6 @@ namespace MongoLinqs
             
         }
 
-        private string ToFieldName(string propertyName)
-        {
-            var fieldName = ToCamelCase(propertyName);
-            if (fieldName == "id") return "_id";
-            return fieldName;
-        }
-
-        private string ToCamelCase(string s)
-        {
-            if (s == null) return null;
-            if (s == string.Empty) return s;
-            return s.Substring(0, 1).ToLower() + s.Substring(1);
-        }
-
         private IMongoCollection<BsonDocument> GetCollection(string collectionName)
         {
             var client = MongoDbHelper.GetClient();

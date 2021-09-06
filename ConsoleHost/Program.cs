@@ -11,7 +11,7 @@ namespace ConsoleHost
         {
             var dbSet = new MongoDbSet<Student>();
             var q = from s in dbSet
-                where s.Name == "aaa"
+                where s.Name == "bbb"
                 select s;
             var students = q.ToList();
             PrintResult(students);
