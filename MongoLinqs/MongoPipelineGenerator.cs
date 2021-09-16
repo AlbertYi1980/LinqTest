@@ -45,8 +45,9 @@ namespace MongoLinqs
         {
             var binary = node as BinaryExpression;
             var constant = node as ConstantExpression;
-            var member = node as MemberExpression;
-
+            var unary = node as UnaryExpression;
+     
+            
             switch (node.NodeType)
             {
                 case ExpressionType.AndAlso:
@@ -77,6 +78,21 @@ namespace MongoLinqs
                     ProcessCondition(binary!.Right, param);
                     _builder.Append("}}");
                     break;
+                case ExpressionType.Not:
+                    _builder.Append("{");
+                    ProcessProperty(unary!.Operand, param);
+                    _builder.Append(":{\"$ne\":");
+                    _builder.Append("true");
+                    _builder.Append("}}");
+                    break;
+                case ExpressionType.MemberAccess:
+                    _builder.Append("{");
+                    ProcessProperty(node, param);
+                    _builder.Append(":{\"$eq\":");
+                    _builder.Append("true");
+                    _builder.Append("}}");
+                    break;
+                    
                 case ExpressionType.Constant:
                     var value = constant!.Value;
                     if (node.Type == typeof(int))
@@ -97,7 +113,7 @@ namespace MongoLinqs
                     {
                         throw new NotSupportedException($"not support const type {node.Type.Name}");
                     }
-
+                    
              
              
                     break;
