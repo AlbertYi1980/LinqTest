@@ -34,16 +34,20 @@ namespace MongoLinqs
             {
                 var elementType = typeof(TResult).GenericTypeArguments.First();
                 var pipelineGenerator = new MongoPipelineGenerator();
-                pipelineGenerator.Visit(expression);
-                var collection = GetCollection(elementType.Name);
-          
+                pipelineGenerator.Visit(expression);   
+                var pipelineResult = pipelineGenerator.Build();
+                var collection = GetCollection(pipelineResult.StartAt);
                 var stages = BsonSerializer
-                    .Deserialize<BsonArray>(pipelineGenerator.Build())
+                    .Deserialize<BsonArray>(pipelineResult.Pipeline)
                     .Select(item => (BsonDocument) item);
   
                 var pipelineDefinition =  PipelineDefinition<BsonDocument, BsonDocument>.Create(stages);
                 var result = collection.Aggregate(pipelineDefinition).ToList();
-               
+                var json = result.ToJson();
+                Console.WriteLine();
+                Console.WriteLine("Raw json:");
+                Console.WriteLine(json);
+                Console.WriteLine();
                 return (TResult)Deserialize(elementType, result);
             }
             else

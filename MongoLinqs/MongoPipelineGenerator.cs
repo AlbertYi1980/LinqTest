@@ -4,93 +4,137 @@ using System.Linq.Expressions;
 using System.Text;
 using System.Text.RegularExpressions;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace MongoLinqs
 {
     public class MongoPipelineGenerator : ExpressionVisitor
     {
         private readonly StringBuilder _builder;
+        private string _startAt;
+        private bool _firstStep = true;
 
         public MongoPipelineGenerator()
         {
             _builder = new StringBuilder();
         }
 
-        
+        protected override Expression VisitConstant(ConstantExpression node)
+        {
+            if (node.Type.GetGenericTypeDefinition() == typeof(MongoDbSet<>))
+            {
+                _startAt ??= node.Type.GenericTypeArguments[0].Name;
+                return node;
+            }
+
+            throw BuildException(node);
+        }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
             if (node.Method.Name == nameof(Enumerable.Where))
             {
-                ProcessWhere(node);
+                VisitWhere(node);
                 return node;
             }
+
             if (node.Method.Name == nameof(Enumerable.Select))
             {
-                ProcessSelect(node);
+                VisitSelect(node);
                 return node;
             }
 
             throw new NotSupportedException("only support where");
         }
 
-        private void ProcessSelect(MethodCallExpression node)
+        private void VisitSelect(MethodCallExpression node)
         {
-            
+            var source = node.Arguments[0];
+            Visit(source);
+            var selector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
+            var param = selector!.Parameters[0];
+            var body = selector.Body;
+            if (param == body)
+            {
+                return;
+            }
+
+            if (!_firstStep)
+            {
+                _firstStep = true;
+                _builder.Append(",");
+            }
+
+            _builder.Append("{\"$project\":{");
+            var newExp = body as NewExpression;
+            var length = newExp!.Constructor!.GetParameters().Length;
+            _builder.Append("\"_id\":false");
+            for (int i = 0; i < length; i++)
+            {
+                _builder.Append(",");
+
+                _builder.Append('"' + ToCamelCase(newExp.Members![i].Name) + '"');
+                _builder.Append(":");
+                var arg = newExp.Arguments[i] as MemberExpression;
+
+                VisitProperty(arg, param, true);
+            }
+
+            _builder.Append("}}");
         }
 
-        private void ProcessCondition(Expression node, Expression param)
+        private void VisitCondition(Expression node, Expression param)
         {
             var binary = node as BinaryExpression;
             var constant = node as ConstantExpression;
             var unary = node as UnaryExpression;
-     
-            
+
+
             switch (node.NodeType)
             {
                 case ExpressionType.AndAlso:
                     _builder.Append("{\"$and\":[");
-                    ProcessCondition(binary!.Left, param);
+                    VisitCondition(binary!.Left, param);
                     _builder.Append(",");
-                    ProcessCondition(binary!.Right, param);
+                    VisitCondition(binary!.Right, param);
                     _builder.Append("]}");
                     break;
                 case ExpressionType.OrElse:
                     _builder.Append("{\"$or\":[");
-                    ProcessCondition(binary!.Left, param);
+                    VisitCondition(binary!.Left, param);
                     _builder.Append(",");
-                    ProcessCondition(binary!.Right, param);
+                    VisitCondition(binary!.Right, param);
                     _builder.Append("]}");
                     break;
                 case ExpressionType.Equal:
                     _builder.Append("{");
-                    ProcessProperty(binary!.Left, param);
+                    VisitProperty(binary!.Left, param);
                     _builder.Append(":{\"$eq\":");
-                    ProcessCondition(binary!.Right, param);
+                    VisitCondition(binary!.Right, param);
                     _builder.Append("}}");
                     break;
                 case ExpressionType.NotEqual:
                     _builder.Append("{");
-                    ProcessProperty(binary!.Left, param);
+                    VisitProperty(binary!.Left, param);
                     _builder.Append(":{\"$ne\":");
-                    ProcessCondition(binary!.Right, param);
+                    VisitCondition(binary!.Right, param);
                     _builder.Append("}}");
                     break;
                 case ExpressionType.Not:
                     _builder.Append("{");
-                    ProcessProperty(unary!.Operand, param);
+                    VisitProperty(unary!.Operand, param);
                     _builder.Append(":{\"$ne\":");
                     _builder.Append("true");
                     _builder.Append("}}");
                     break;
                 case ExpressionType.MemberAccess:
                     _builder.Append("{");
-                    ProcessProperty(node, param);
+                    VisitProperty(node, param);
                     _builder.Append(":{\"$eq\":");
                     _builder.Append("true");
                     _builder.Append("}}");
                     break;
-                    
+
                 case ExpressionType.Constant:
                     var value = constant!.Value;
                     if (node.Type == typeof(int))
@@ -111,12 +155,11 @@ namespace MongoLinqs
                     {
                         throw new NotSupportedException($"not support const type {node.Type.Name}");
                     }
-                    
-             
-             
+
+
                     break;
                 case ExpressionType.Call:
-                    ProcessSpecialCondition(node, param);
+                    VisitSpecialCondition(node, param);
                     break;
                 default:
 
@@ -124,17 +167,25 @@ namespace MongoLinqs
             }
         }
 
-        private void ProcessProperty(Expression node, Expression param)
+        private void VisitProperty(Expression node, Expression param, bool isPlaceHolder = false)
         {
             var member = node as MemberExpression;
             if (member!.Expression != param)
             {
                 throw new NotSupportedException("property should belong to lambda parameter");
             }
-            _builder.Append($"\"{GetMemberName(member)}\"");
+
+            if (isPlaceHolder)
+            {
+                _builder.Append($"\"${GetMemberName(member)}\"");
+            }
+            else
+            {
+                _builder.Append($"\"{GetMemberName(member)}\"");
+            }
         }
 
-        private void ProcessSpecialCondition(Expression node, Expression param)
+        private void VisitSpecialCondition(Expression node, Expression param)
         {
             var call = node as MethodCallExpression;
             if (call!.Method.Name != nameof(string.Contains)) throw BuildException(node);
@@ -144,12 +195,12 @@ namespace MongoLinqs
             if (left!.Type != typeof(string) || right!.Type != typeof(string)) throw BuildException(node);
             if (left.NodeType != ExpressionType.MemberAccess) throw BuildException(node);
             if (right.NodeType != ExpressionType.Constant) throw BuildException(node);
-        
+
 
             _builder.Append("{");
-            ProcessProperty(left, param);
+            VisitProperty(left, param);
             _builder.Append(":{\"$regex\":");
-            _builder.Append(JsonConvert.ToString( $".*{Regex.Escape( right.Value!.ToString()!)}.*"));
+            _builder.Append(JsonConvert.ToString($".*{Regex.Escape(right.Value!.ToString()!)}.*"));
             _builder.Append("}");
             _builder.Append("}");
         }
@@ -166,14 +217,25 @@ namespace MongoLinqs
             return memberName == "id" ? "_id" : memberName;
         }
 
-        private void ProcessWhere(MethodCallExpression node)
+        private void VisitWhere(MethodCallExpression node)
         {
+            var source = node.Arguments[0];
+            Visit(source);
+            if (_firstStep)
+            {
+                _firstStep = false;
+            }
+            else
+            {
+                _builder.Append(",");
+            }
+
             _builder.Append("{");
             _builder.Append("\"$match\":");
             var lambda = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
             var body = lambda!.Body;
             var parameter = lambda.Parameters[0];
-            ProcessCondition(body, parameter);
+            VisitCondition(body, parameter);
             _builder.Append("}");
         }
 
@@ -184,10 +246,33 @@ namespace MongoLinqs
             return s.Substring(0, 1).ToLower() + s.Substring(1);
         }
 
-        public string Build()
+        public MongoPipelineResult Build()
         {
             var pipeline = $"[{_builder}]";
-            return pipeline;
+            Console.WriteLine();
+            Console.WriteLine("Pipe line:");
+            Console.WriteLine(FormatPipeline(pipeline));
+            Console.WriteLine();
+            return new MongoPipelineResult()
+            {
+                StartAt = _startAt,
+                Pipeline = pipeline,
+            };
         }
+
+        private string FormatPipeline(string pipeline)
+        {
+            var jArray = JsonConvert.DeserializeObject<JArray>(pipeline);
+            return JsonConvert.SerializeObject(jArray, new JsonSerializerSettings()
+            {
+                Formatting = Formatting.Indented
+            });
+        }
+    }
+
+    public class MongoPipelineResult
+    {
+        public string StartAt { get; set; }
+        public string Pipeline { get; set; }
     }
 }
