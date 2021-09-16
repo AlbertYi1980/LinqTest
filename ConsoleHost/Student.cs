@@ -11,7 +11,7 @@
 
         public override string ToString()
         {
-            return $"id:{Id},name:{Name}";
+            return $"id:{Id},name:{Name},enabled:{Enabled},age:{Age}";
         }
     }
 

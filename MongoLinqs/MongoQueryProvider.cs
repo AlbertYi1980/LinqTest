@@ -38,10 +38,7 @@ namespace MongoLinqs
                 var collection = GetCollection(elementType.Name);
           
                 var stages = BsonSerializer
-                    .Deserialize<BsonArray>(pipelineGenerator.Build(), c =>
-                    {
-                    
-                    })
+                    .Deserialize<BsonArray>(pipelineGenerator.Build())
                     .Select(item => (BsonDocument) item);
   
                 var pipelineDefinition =  PipelineDefinition<BsonDocument, BsonDocument>.Create(stages);

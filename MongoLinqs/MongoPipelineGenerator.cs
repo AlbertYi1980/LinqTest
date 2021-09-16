@@ -16,17 +16,7 @@ namespace MongoLinqs
             _builder = new StringBuilder();
         }
 
-
-        protected override Expression VisitConstant(ConstantExpression node)
-        {
-            if (node.Type.IsGenericType && node.Type.GetGenericTypeDefinition() == typeof(MongoDbSet<>))
-            {
-                var elementType = node.Type.GenericTypeArguments.First();
-            }
-
-            return base.VisitConstant(node);
-        }
-
+        
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {
@@ -35,10 +25,18 @@ namespace MongoLinqs
                 ProcessWhere(node);
                 return node;
             }
-            else
+            if (node.Method.Name == nameof(Enumerable.Select))
             {
-                throw new NotSupportedException("only support where");
+                ProcessSelect(node);
+                return node;
             }
+
+            throw new NotSupportedException("only support where");
+        }
+
+        private void ProcessSelect(MethodCallExpression node)
+        {
+            
         }
 
         private void ProcessCondition(Expression node, Expression param)
@@ -133,7 +131,6 @@ namespace MongoLinqs
             {
                 throw new NotSupportedException("property should belong to lambda parameter");
             }
-
             _builder.Append($"\"{GetMemberName(member)}\"");
         }
 
