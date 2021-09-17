@@ -9,8 +9,17 @@
         
         public int Age { get; set; }
 
+        public int SchoolId { get; set; }
       
     }
 
+    
+    public class School
+    {
+        public int Id { get; set; }
+        public string Name { get; set; }
+        
+      
+    }
  
 }

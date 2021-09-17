@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -10,24 +11,30 @@ namespace MongoLinqs
 {
     public class MongoPipelineGenerator : ExpressionVisitor
     {
-        private readonly StringBuilder _builder;
+   
         private string _startAt;
-        private bool _firstStep = true;
+        private List<string> _steps;
 
         public MongoPipelineGenerator()
         {
-            _builder = new StringBuilder();
+         
+            _steps = new List<string>();
         }
 
         protected override Expression VisitConstant(ConstantExpression node)
         {
             if (node.Type.GetGenericTypeDefinition() == typeof(MongoDbSet<>))
             {
-                _startAt ??= node.Type.GenericTypeArguments[0].Name;
+                VisitStartCollection(node);
                 return node;
             }
 
             throw BuildException(node);
+        }
+
+        private void VisitStartCollection(ConstantExpression node)
+        {
+            _startAt ??= ToCamelCase(node.Type.GenericTypeArguments[0].Name);
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -44,7 +51,72 @@ namespace MongoLinqs
                 return node;
             }
 
-            throw new NotSupportedException("only support where");
+            if (node.Method.Name == nameof(Enumerable.SelectMany))
+            {
+                VisitSelectMany(node);
+                return node;
+            }
+
+            throw new NotSupportedException($"method {node.Method.Name} is not supported.");
+        }
+
+        private void VisitSelectMany(MethodCallExpression node)
+        {
+            var pc = node.Method.GetParameters().Count();
+            if (pc == 2)
+            {
+                throw BuildException(node);
+            }
+            else if (pc == 3)
+            {
+                var source = node.Arguments[0];
+                Visit(source);
+                var collectionSelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
+                var secondarySetEx = collectionSelector!.Body;
+
+                if (secondarySetEx.Type.GetGenericTypeDefinition() != typeof(MongoDbSet<>))
+                {
+                    throw BuildException(node);
+                }
+
+
+                var attached = ToCamelCase(secondarySetEx.Type.GenericTypeArguments[0].Name);
+                var resultSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var first = resultSelector!.Parameters[0].Name;
+                var second = resultSelector.Parameters[1].Name;
+                var temp = $"f_{Guid.NewGuid():n}";
+                var script = $@"
+                {{
+                    ""$lookup"": {{
+                        ""from"": ""{attached}"",
+                        ""pipeline"": [
+
+                        ],
+                        ""as"": ""{temp}""
+                    }}
+                }},
+                {{
+                    ""$unwind"": ""${temp}""
+                }},
+                {{
+                    ""$project"":{{
+                        ""{first}"" : ""$$ROOT"",
+                        ""{second}"":""${temp}""
+                    }}
+                }},
+                {{
+                    ""$project"":{{
+                        ""_id"":false,
+                        ""{first}.{temp}"": false
+                    }}
+                }}
+                ";
+                _steps.Add(script);
+            }
+            else
+            {
+                throw BuildException(node);
+            }
         }
 
         private void VisitSelect(MethodCallExpression node)
@@ -59,97 +131,129 @@ namespace MongoLinqs
                 return;
             }
 
-            if (!_firstStep)
+            
+
+
+            if (body is NewExpression)
             {
-                _firstStep = true;
-                _builder.Append(",");
+                var builder = new StringBuilder();
+                builder.Append("{\"$project\":{");
+                builder.Append( ProcessSelectNew(body));
+                builder.Append("}}");
+                _steps.Add(builder.ToString());
             }
-
-            _builder.Append("{\"$project\":{");
-            var newExp = body as NewExpression;
-            var length = newExp!.Constructor!.GetParameters().Length;
-            _builder.Append("\"_id\":false");
-            for (int i = 0; i < length; i++)
+            else if (body is MemberExpression)
             {
-                _builder.Append(",");
-
-                _builder.Append('"' + ToCamelCase(newExp.Members![i].Name) + '"');
-                _builder.Append(":");
-                var arg = newExp.Arguments[i] as MemberExpression;
-
-                VisitProperty(arg, param, true);
+               _steps.Add( ProcessSelectMember(body));
             }
-
-            _builder.Append("}}");
+            else
+            {
+                throw BuildException(node);
+            }
         }
 
-        private void VisitCondition(Expression node, Expression param)
+        private string ProcessSelectMember(Expression body)
+        {
+            var builder = new StringBuilder();
+            var member = body as MemberExpression;
+            var memberPath = GetMemberPath(member);
+            var script = @" {{
+                ""$replaceRoot"":{{
+                ""newRoot"":""${0}""
+            }}
+            }}";
+            builder.AppendFormat(script, memberPath);
+            return builder.ToString();
+        }
+
+        private string ProcessSelectNew(Expression body)
+        {
+            var sb = new StringBuilder();
+            var newExp = body as NewExpression;
+            var length = newExp!.Constructor!.GetParameters().Length;
+            sb.Append("\"_id\":false");
+            for (int i = 0; i < length; i++)
+            {
+                sb.Append(",");
+
+                sb.Append('"' + ToCamelCase(newExp.Members![i].Name) + '"');
+                sb.Append(":");
+                var arg = newExp.Arguments[i] as MemberExpression;
+
+              sb.Append(  VisitProperty(arg, true)) ;
+            }
+
+            return sb.ToString();
+        }
+
+        private string VisitCondition(Expression node)
         {
             var binary = node as BinaryExpression;
             var constant = node as ConstantExpression;
             var unary = node as UnaryExpression;
-
+            
+            var builder = new StringBuilder();
 
             switch (node.NodeType)
             {
                 case ExpressionType.AndAlso:
-                    _builder.Append("{\"$and\":[");
-                    VisitCondition(binary!.Left, param);
-                    _builder.Append(",");
-                    VisitCondition(binary!.Right, param);
-                    _builder.Append("]}");
+                    builder.Append("{\"$and\":[");
+                    builder.Append( VisitCondition(binary!.Left));
+                    builder.Append(",");
+                    builder.Append(VisitCondition(binary!.Right));
+                    builder.Append("]}");
                     break;
                 case ExpressionType.OrElse:
-                    _builder.Append("{\"$or\":[");
-                    VisitCondition(binary!.Left, param);
-                    _builder.Append(",");
-                    VisitCondition(binary!.Right, param);
-                    _builder.Append("]}");
+                    builder.Append("{\"$or\":[");
+                    builder.Append( VisitCondition(binary!.Left));
+                    builder.Append(",");
+                    builder.Append(VisitCondition(binary!.Right));
+                    builder.Append("]}");
                     break;
                 case ExpressionType.Equal:
-                    _builder.Append("{");
-                    VisitProperty(binary!.Left, param);
-                    _builder.Append(":{\"$eq\":");
-                    VisitCondition(binary!.Right, param);
-                    _builder.Append("}}");
+                    builder.Append("{");
+                    builder.Append(VisitProperty(binary!.Left));
+                    builder.Append(":{\"$eq\":");
+                    builder.Append(VisitCondition(binary!.Right));
+                    builder.Append("}}");
                     break;
                 case ExpressionType.NotEqual:
-                    _builder.Append("{");
-                    VisitProperty(binary!.Left, param);
-                    _builder.Append(":{\"$ne\":");
-                    VisitCondition(binary!.Right, param);
-                    _builder.Append("}}");
+                    builder.Append("{");
+                    builder.Append(VisitProperty(binary!.Left));
+                    builder.Append(":{\"$ne\":");
+                    builder.Append(VisitCondition(binary!.Right));
+                    builder.Append("}}");
                     break;
                 case ExpressionType.Not:
-                    _builder.Append("{");
-                    VisitProperty(unary!.Operand, param);
-                    _builder.Append(":{\"$ne\":");
-                    _builder.Append("true");
-                    _builder.Append("}}");
+                    builder.Append("{");
+                    builder.Append(VisitProperty(unary!.Operand));
+                    builder.Append(":{\"$ne\":");
+                    builder.Append("true");
+                    builder.Append("}}");
                     break;
                 case ExpressionType.MemberAccess:
-                    _builder.Append("{");
-                    VisitProperty(node, param);
-                    _builder.Append(":{\"$eq\":");
-                    _builder.Append("true");
-                    _builder.Append("}}");
+                    builder.Append("{");
+                    builder.Append(VisitProperty(node));
+                    builder.Append(":{\"$eq\":");
+                    builder.Append("true");
+                    builder.Append("}}");
                     break;
 
                 case ExpressionType.Constant:
                     var value = constant!.Value;
                     if (node.Type == typeof(int))
                     {
-                        _builder.Append(value);
+                        builder.Append(value);
                     }
                     else if (node.Type == typeof(int?))
                     {
                         var s = value == null ? "null" : value.ToString();
-                        _builder.Append(s);
+                        builder.Append(s);
                     }
                     else if (node.Type == typeof(string))
                     {
                         var s = value == null ? "null" : JsonConvert.ToString(value);
-                        _builder.Append(s);
+                        builder.Append(s);
                     }
                     else
                     {
@@ -159,33 +263,32 @@ namespace MongoLinqs
 
                     break;
                 case ExpressionType.Call:
-                    VisitSpecialCondition(node, param);
+                   builder.Append(  VisitSpecialCondition(node));
                     break;
                 default:
 
                     throw BuildException(node);
             }
+
+            return builder.ToString();
         }
 
-        private void VisitProperty(Expression node, Expression param, bool isPlaceHolder = false)
+        private string VisitProperty(Expression node, bool isPlaceHolder = false)
         {
             var member = node as MemberExpression;
-            if (member!.Expression != param)
-            {
-                throw new NotSupportedException("property should belong to lambda parameter");
-            }
-
+            var builder = new StringBuilder();
             if (isPlaceHolder)
             {
-                _builder.Append($"\"${GetMemberName(member)}\"");
+                builder.Append($"\"${GetMemberPath(member)}\"");
             }
             else
             {
-                _builder.Append($"\"{GetMemberName(member)}\"");
+                builder.Append($"\"{GetMemberPath(member)}\"");
             }
+            return builder.ToString();
         }
 
-        private void VisitSpecialCondition(Expression node, Expression param)
+        private string VisitSpecialCondition(Expression node)
         {
             var call = node as MethodCallExpression;
             if (call!.Method.Name != nameof(string.Contains)) throw BuildException(node);
@@ -196,13 +299,15 @@ namespace MongoLinqs
             if (left.NodeType != ExpressionType.MemberAccess) throw BuildException(node);
             if (right.NodeType != ExpressionType.Constant) throw BuildException(node);
 
+            var builder = new StringBuilder();
 
-            _builder.Append("{");
-            VisitProperty(left, param);
-            _builder.Append(":{\"$regex\":");
-            _builder.Append(JsonConvert.ToString($".*{Regex.Escape(right.Value!.ToString()!)}.*"));
-            _builder.Append("}");
-            _builder.Append("}");
+            builder.Append("{");
+            VisitProperty(left);
+            builder.Append(":{\"$regex\":");
+            builder.Append(JsonConvert.ToString($".*{Regex.Escape(right.Value!.ToString()!)}.*"));
+            builder.Append("}");
+            builder.Append("}");
+            return builder.ToString();
         }
 
         private static NotSupportedException BuildException(Expression node)
@@ -210,10 +315,22 @@ namespace MongoLinqs
             return new NotSupportedException($"{node} is not supported.");
         }
 
-        private static string GetMemberName(MemberExpression member)
+        private static string GetMemberPath(MemberExpression member)
         {
-            var memberName = member.Member.Name;
-            memberName = ToCamelCase(memberName);
+            var list = new List<string>();
+            var current = member;
+            do
+            {
+                list.Insert(0, FixMemberName(ToCamelCase(current.Member.Name)));
+                current = current.Expression as MemberExpression;
+            } while (current != null);
+
+            var path = string.Join(".", list);
+            return path;
+        }
+
+        private static string FixMemberName(string memberName)
+        {
             return memberName == "id" ? "_id" : memberName;
         }
 
@@ -221,22 +338,16 @@ namespace MongoLinqs
         {
             var source = node.Arguments[0];
             Visit(source);
-            if (_firstStep)
-            {
-                _firstStep = false;
-            }
-            else
-            {
-                _builder.Append(",");
-            }
+           
+            var builder = new StringBuilder();
 
-            _builder.Append("{");
-            _builder.Append("\"$match\":");
+            builder.Append("{");
+            builder.Append("\"$match\":");
             var lambda = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
             var body = lambda!.Body;
-            var parameter = lambda.Parameters[0];
-            VisitCondition(body, parameter);
-            _builder.Append("}");
+            builder.Append( VisitCondition(body));
+            builder.Append("}");
+            _steps.Add(builder.ToString());
         }
 
         private static string ToCamelCase(string s)
@@ -248,10 +359,11 @@ namespace MongoLinqs
 
         public MongoPipelineResult Build()
         {
-            var pipeline = $"[{_builder}]";
+            var pipeline = $"[{string.Join(",", _steps)}]"; 
+            pipeline = FormatPipeline(pipeline);
             Console.WriteLine();
             Console.WriteLine("Pipe line:");
-            Console.WriteLine(FormatPipeline(pipeline));
+            Console.WriteLine(pipeline);
             Console.WriteLine();
             return new MongoPipelineResult()
             {
