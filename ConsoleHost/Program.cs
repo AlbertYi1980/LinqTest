@@ -36,11 +36,18 @@ namespace ConsoleHost
             //     Console.WriteLine(JsonConvert.SerializeObject(school));
             // }
 
-            var q3 = from s1 in schoolSet
-                from s2 in studentSet
+            // var q3 = from s1 in schoolSet
+            //     from s2 in studentSet
+            //     where s2.Name != "a"
+            //     select s2;
+            
+            
+            var q4 = from s1 in schoolSet
+                join s2 in studentSet on s1.Id equals s2.SchoolId  
                 where s2.Name != "a"
-                select s2;
-            var list = q3.ToList();
+                select new { SchoolName = s1.Name, StudentName = s2.Name};
+            var list = q4.ToList();
+          
             foreach (var student in list)
             {
                 Console.WriteLine(JsonConvert.SerializeObject(student));

@@ -11,13 +11,11 @@ namespace MongoLinqs
 {
     public class MongoPipelineGenerator : ExpressionVisitor
     {
-   
         private string _startAt;
-        private List<string> _steps;
+        private readonly List<string> _steps;
 
         public MongoPipelineGenerator()
         {
-         
             _steps = new List<string>();
         }
 
@@ -54,6 +52,12 @@ namespace MongoLinqs
             if (node.Method.Name == nameof(Enumerable.SelectMany))
             {
                 VisitSelectMany(node);
+                return node;
+            }
+
+            if (node.Method.Name == nameof(Enumerable.Join))
+            {
+                VisitJoin(node);
                 return node;
             }
 
@@ -119,6 +123,66 @@ namespace MongoLinqs
             }
         }
 
+        private void VisitJoin(MethodCallExpression node)
+        {
+            var pc = node.Method.GetParameters().Count();
+            if (pc < 5)
+            {
+                throw BuildException(node);
+            }
+            else if (pc == 5)
+            {
+                var outer = node.Arguments[0];
+                Visit(outer);
+                var inner = node.Arguments[1] ;
+                if (inner!.Type.GetGenericTypeDefinition() != typeof(MongoDbSet<>))
+                {
+                    throw BuildException(node);
+                }
+
+
+                var attached = ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
+                var outerKeySelector =  (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var outerKey = FixMemberName( ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKeySelector =  (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
+                var innerKey =FixMemberName( ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
+                var first = resultSelector!.Parameters[0].Name;
+                var second = resultSelector.Parameters[1].Name;
+                var temp = $"f_{Guid.NewGuid():n}";
+                var script = $@"
+                {{
+                    ""$lookup"": {{
+                        ""from"": ""{attached}"",
+                        ""localField"": ""{outerKey}"",
+                        ""foreignField"": ""{innerKey}"",  
+                        ""as"": ""{temp}""
+                    }}
+                }},
+                {{
+                    ""$unwind"": ""${temp}""
+                }},
+                {{
+                    ""$project"":{{
+                        ""{first}"" : ""$$ROOT"",
+                        ""{second}"":""${temp}""
+                    }}
+                }},
+                {{
+                    ""$project"":{{
+                        ""_id"":false,
+                        ""{first}.{temp}"": false
+                    }}
+                }}
+                ";
+                _steps.Add(script);
+            }
+            else
+            {
+                throw BuildException(node);
+            }
+        }
+
         private void VisitSelect(MethodCallExpression node)
         {
             var source = node.Arguments[0];
@@ -131,20 +195,18 @@ namespace MongoLinqs
                 return;
             }
 
-            
-
 
             if (body is NewExpression)
             {
                 var builder = new StringBuilder();
                 builder.Append("{\"$project\":{");
-                builder.Append( ProcessSelectNew(body));
+                builder.Append(ProcessSelectNew(body));
                 builder.Append("}}");
                 _steps.Add(builder.ToString());
             }
             else if (body is MemberExpression)
             {
-               _steps.Add( ProcessSelectMember(body));
+                _steps.Add(ProcessSelectMember(body));
             }
             else
             {
@@ -180,7 +242,7 @@ namespace MongoLinqs
                 sb.Append(":");
                 var arg = newExp.Arguments[i] as MemberExpression;
 
-              sb.Append(  VisitProperty(arg, true)) ;
+                sb.Append(VisitProperty(arg, true));
             }
 
             return sb.ToString();
@@ -191,21 +253,21 @@ namespace MongoLinqs
             var binary = node as BinaryExpression;
             var constant = node as ConstantExpression;
             var unary = node as UnaryExpression;
-            
+
             var builder = new StringBuilder();
 
             switch (node.NodeType)
             {
                 case ExpressionType.AndAlso:
                     builder.Append("{\"$and\":[");
-                    builder.Append( VisitCondition(binary!.Left));
+                    builder.Append(VisitCondition(binary!.Left));
                     builder.Append(",");
                     builder.Append(VisitCondition(binary!.Right));
                     builder.Append("]}");
                     break;
                 case ExpressionType.OrElse:
                     builder.Append("{\"$or\":[");
-                    builder.Append( VisitCondition(binary!.Left));
+                    builder.Append(VisitCondition(binary!.Left));
                     builder.Append(",");
                     builder.Append(VisitCondition(binary!.Right));
                     builder.Append("]}");
@@ -263,7 +325,7 @@ namespace MongoLinqs
 
                     break;
                 case ExpressionType.Call:
-                   builder.Append(  VisitSpecialCondition(node));
+                    builder.Append(VisitSpecialCondition(node));
                     break;
                 default:
 
@@ -285,6 +347,7 @@ namespace MongoLinqs
             {
                 builder.Append($"\"{GetMemberPath(member)}\"");
             }
+
             return builder.ToString();
         }
 
@@ -338,14 +401,14 @@ namespace MongoLinqs
         {
             var source = node.Arguments[0];
             Visit(source);
-           
+
             var builder = new StringBuilder();
 
             builder.Append("{");
             builder.Append("\"$match\":");
             var lambda = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
             var body = lambda!.Body;
-            builder.Append( VisitCondition(body));
+            builder.Append(VisitCondition(body));
             builder.Append("}");
             _steps.Add(builder.ToString());
         }
@@ -359,7 +422,7 @@ namespace MongoLinqs
 
         public MongoPipelineResult Build()
         {
-            var pipeline = $"[{string.Join(",", _steps)}]"; 
+            var pipeline = $"[{string.Join(",", _steps)}]";
             pipeline = FormatPipeline(pipeline);
             Console.WriteLine();
             Console.WriteLine("Pipe line:");
