@@ -40,14 +40,20 @@ namespace ConsoleHost
             //     from s2 in studentSet
             //     where s2.Name != "a"
             //     select s2;
-            
-            
-            var q4 = from s1 in schoolSet
-                join s2 in studentSet on s1.Id equals s2.SchoolId  
-                where s2.Name != "a"
-                select new { SchoolName = s1.Name, StudentName = s2.Name};
-            var list = q4.ToList();
-          
+
+
+            // var q4 = from s1 in schoolSet
+            //     join s2 in studentSet on s1.Id equals s2.SchoolId  
+            //     where s2.Name != "a"
+            //     select new { SchoolName = s1.Name, StudentName = s2.Name};
+
+
+            var q5 = from s in studentSet
+                group s.Name by s.SchoolId
+                into g
+                select new {SchoolId = g.Key, Count = g.Count()};
+            var list = q5.ToList();
+
             foreach (var student in list)
             {
                 Console.WriteLine(JsonConvert.SerializeObject(student));
