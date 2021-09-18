@@ -1,6 +1,6 @@
-﻿namespace MongoLinqs
+﻿namespace MongoLinqs.Selectors
 {
-    public enum MongoSelectorResultKind
+    public enum SelectorResultKind
     {
         Root,
         New,

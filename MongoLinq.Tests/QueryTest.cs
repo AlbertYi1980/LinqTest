@@ -19,6 +19,22 @@ namespace MongoLinq.Tests
             _studentSet = new MongoDbSet<Student>();
             _schoolSet = new MongoDbSet<School>();
         }
+        
+        
+        [Fact]
+        public void Where()
+        {
+            var q = from s in _studentSet
+                where  s.Id == 2 && s.Name.Contains("bb") && s.Name == "bbb" 
+                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
 
         [Fact]
         public void SelectNew()
