@@ -36,6 +36,49 @@ namespace MongoLinq.Tests
         }
 
         [Fact]
+        public void SelectNewInit()
+        {
+            var q = from s in _studentSet
+                select new Student() {Id = s.Id, Name = "dd", Enabled = s.Enabled,};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+        [Fact]
+        public void SelectNewNull()
+        {
+            var q = from s in _studentSet
+                select new Student() {Id = s.Id, Name = null, Enabled = s.Enabled,};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+        [Fact]
+        public void SelectComplexNew()
+        {
+            var q = from s in _studentSet
+                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId , Age = new { Value = s.Age} };
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+
+        [Fact]
         public void SelectConst()
         {
             var q = from s in _studentSet
@@ -62,6 +105,7 @@ namespace MongoLinq.Tests
                 _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
+
 
         [Fact]
         public void SelectDirect()

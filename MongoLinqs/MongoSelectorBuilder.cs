@@ -28,7 +28,7 @@ namespace MongoLinqs
                 return new MongoSelectorResult
                 {
                     Kind = MongoSelectorResultKind.Root,
-                    Script = "$$ROOT"
+                    Script = "\"$$ROOT\""
                 };
             }
 
@@ -37,7 +37,7 @@ namespace MongoLinqs
                 return new MongoSelectorResult
                 {
                     Kind = MongoSelectorResultKind.Member,
-                    Script = "$" + BuildMember(member, param)
+                    Script =  BuildMember(member, param)
                 };
             }
 
@@ -47,6 +47,15 @@ namespace MongoLinqs
                 {
                     Kind = MongoSelectorResultKind.New,
                     Script = BuildNew(@new, param)
+                };
+            }
+
+            if (body is MemberInitExpression memberInit)
+            {
+                return new MongoSelectorResult
+                {
+                    Kind = MongoSelectorResultKind.New,
+                    Script = BuildMemberInit(memberInit, param)
                 };
             }
 
@@ -86,7 +95,7 @@ namespace MongoLinqs
                 }
             } while (current != null);
 
-            return string.Join(".", list);
+            return $"\"${string.Join(".", list)}\""; ;
         }
 
         private static string BuildNew(NewExpression @new, Expression param)
@@ -97,11 +106,28 @@ namespace MongoLinqs
             {
                 var name = NameHelper.ToCamelCase(@new.Members![i].Name);
                 var value = BuildCore(@new.Arguments[i], param).Script;
-                var member = $"\"{name}\":\"{value}\"";
+                var member = $"\"{name}\":{value}";
                 members.Add(member);
             }
 
-            return string.Join(",", members);
+            return $"{{{string.Join(",", members)}}}" ;
+        }
+
+        private static string BuildMemberInit(MemberInitExpression memberInit, Expression param)
+        {
+            var length = memberInit!.Bindings!.Count;
+            var members = new List<string>();
+            for (var i = 0; i < length; i++)
+            {
+                var assignment = (MemberAssignment) memberInit.Bindings[i];
+                var name = NameHelper.ToCamelCase(assignment.Member.Name);
+                var result = BuildCore(assignment.Expression, param);
+                var value = result.Script;
+                var member = $"\"{name}\":{value}";
+                members.Add(member);
+            }
+
+            return $"{{{string.Join(",", members)}}}" ;
         }
     }
 }

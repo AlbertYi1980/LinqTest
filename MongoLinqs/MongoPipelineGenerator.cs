@@ -262,22 +262,22 @@ namespace MongoLinqs
             if (result.Kind == MongoSelectorResultKind.Member )
             {
                 var temp = $"f_{Guid.NewGuid():n}";
-                _steps.Add($"{{\"$project\":{{\"{temp}\":\"{result.Script}\"}}}}");
+                _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
                 _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
                 return;
             }
-            //
-            // if (result.Kind == MongoSelectorResultKind.Constant )
-            // {
-            //     var temp = $"f_{Guid.NewGuid():n}";
-            //     _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
-            //     _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
-            //     return;
-            // }
+            
+            if (result.Kind == MongoSelectorResultKind.Constant )
+            {
+                var temp = $"f_{Guid.NewGuid():n}";
+                _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
+                _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
+                return;
+            }
 
             if (result.Kind == MongoSelectorResultKind.New)
             {
-                _steps.Add($"{{\"$project\":{{{result.Script}}}}}");
+                _steps.Add($"{{\"$project\":{result.Script}}}");
                 return;
             }
             throw BuildException(node);
