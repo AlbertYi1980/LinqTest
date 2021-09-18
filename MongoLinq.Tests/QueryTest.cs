@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using MongoLinqs;
+using MongoLinqs.Grouping;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -165,13 +166,40 @@ namespace MongoLinq.Tests
         }
 
         [Fact]
-        public void Group()
+        public void GroupCount()
         {
-            var q = from s in _studentSet
-                group s.Name by s.SchoolId
-                into g
+            var q = from s in  _studentSet 
+                group s by s.SchoolId into g
                 select new {SchoolId = g.Key, Stats = new {Count = g.Count()}};
             var list = q.ToList();
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void GroupAvg()
+        {
+            var q = from s in  _studentSet 
+                group s by s.SchoolId into g
+                select new {SchoolId = g.Key, Stats = new { AvgAge = g.Average(i => i.Age)}};
+            var list = q.ToList();
+          
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void GroupAvg2()
+        {
+            var q = from s in  _studentSet 
+                group s.Age by s.SchoolId into g
+                select new {SchoolId = g.Key,  AvgAge = g.Average()};
+            var list = q.ToList();
+          
             foreach (var item in list)
             {
                 _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));

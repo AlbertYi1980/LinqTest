@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using MongoLinqs.Grouping;
 using MongoLinqs.MemberPath;
 using Newtonsoft.Json;
 
@@ -22,7 +24,7 @@ namespace MongoLinqs.Selectors
             return BuildCore(_body);
         }
 
-        private  SelectorResult BuildCore(Expression current)
+        private SelectorResult BuildCore(Expression current)
         {
             if (_param == current)
             {
@@ -69,8 +71,52 @@ namespace MongoLinqs.Selectors
                 };
             }
 
+            if (current is MethodCallExpression call)
+            {
+                if (!GroupHelper.IsGroupCall(call))
+                {
+                    throw new NotSupportedException();
+                }
+
+                if (call.Method.Name == nameof(Enumerable.Count))
+                {
+                    return new SelectorResult()
+                    {
+                        Kind = SelectorResultKind.Member,
+                        Script = $"{{\"$size\":\"${GroupHelper.GroupElements}\"}}"
+                    };
+                }
+
+                if (call.Method.Name == nameof(Enumerable.Average))
+                {
+                    if (call.Arguments.Count == 1)
+                    {
+                        return new SelectorResult()
+                        {
+                            Kind = SelectorResultKind.Member,
+                            Script = $"{{\"$avg\":\"${GroupHelper.GroupElements}\"}}"
+                        };
+                    }
+                    else
+                    {
+                        var lambda = call.Arguments[1] as LambdaExpression;
+                        var path = MemberAccessHelper.GetPath(lambda.Body as MemberExpression, lambda.Parameters[0]);
+                        return new SelectorResult()
+                        {
+                            Kind = SelectorResultKind.Member,
+                            Script = $"{{\"$avg\":\"${GroupHelper.GroupElements}.{path}\"}}"
+                        };
+                    }
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
+            }
+
             throw new NotSupportedException();
         }
+
 
         private string BuildMember(MemberExpression member)
         {

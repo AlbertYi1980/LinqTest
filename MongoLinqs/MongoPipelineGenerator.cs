@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using MongoLinqs.Conditions;
+using MongoLinqs.Grouping;
 using MongoLinqs.Selectors;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -188,21 +189,39 @@ namespace MongoLinqs
             }
         }
 
-        private const string GroupElements = "f_94af22dbce8645b6a8c97cc2f28a9fc7";
+       
 
         private void VisitGroupBy(MethodCallExpression node)
         {
             var pc = node.Method.GetParameters().Count();
-            if (pc < 3)
+            if (pc < 2)
             {
                 throw BuildException(node);
             }
-            else if (pc == 3)
+            else if ( pc == 2)
             {
                 var source = node.Arguments[0];
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-                var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var keySelectorScript = new SelectorBuilder(keySelector).Build();
+               
+                
+                var script = $@"
+                {{
+                    ""$group"": {{
+                        ""_id"": {keySelectorScript.Script},
+                        ""{GroupHelper.GroupElements}"":{{""$push"":""$$ROOT""}},
+                    }}
+                }}
+                ";
+                _steps.Add(script);
+            }
+            else if ( pc == 3)
+            {
+                var source = node.Arguments[0];
+                Visit(source);
+                var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
+                var elementSelector =  (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var keySelectorScript = new SelectorBuilder(keySelector).Build();
                 var elementSelectorScript = new SelectorBuilder(elementSelector).Build();
                 
@@ -210,7 +229,7 @@ namespace MongoLinqs
                 {{
                     ""$group"": {{
                         ""_id"": {keySelectorScript.Script},
-                        ""{GroupElements}"": {elementSelectorScript.Script},
+                        ""{GroupHelper.GroupElements}"":{{""$push"":{elementSelectorScript.Script}}},
                     }}
                 }}
                 ";

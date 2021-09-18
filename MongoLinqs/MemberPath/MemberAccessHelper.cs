@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
+using MongoLinqs.Grouping;
 
 namespace MongoLinqs.MemberPath
 {
@@ -12,7 +14,14 @@ namespace MongoLinqs.MemberPath
             var current = member;
             do
             {
-                list.Insert(0, NameHelper.FixMemberName(NameHelper.ToCamelCase(current.Member.Name)));
+                var memberName = NameHelper.FixMemberName(NameHelper.ToCamelCase(current.Member.Name));
+                if (GroupHelper.IsGroupMember(current) && current.Member.Name == "Key")
+                {
+                    memberName = "_id";
+                }
+
+              
+                list.Insert(0, memberName);
                 if (current.Expression is MemberExpression expression)
                 {
                     current = expression;
