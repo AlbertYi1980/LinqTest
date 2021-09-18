@@ -1,4 +1,4 @@
-﻿namespace ConsoleHost
+﻿namespace MongoLinq.Tests
 {
     public class Student
     {

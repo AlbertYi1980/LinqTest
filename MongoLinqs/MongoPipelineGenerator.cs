@@ -60,6 +60,12 @@ namespace MongoLinqs
                 VisitJoin(node);
                 return node;
             }
+            
+            if (node.Method.Name == nameof(Enumerable.GroupBy))
+            {
+                VisitGroupBy(node);
+                return node;
+            }
 
             throw new NotSupportedException($"method {node.Method.Name} is not supported.");
         }
@@ -134,7 +140,7 @@ namespace MongoLinqs
             {
                 var outer = node.Arguments[0];
                 Visit(outer);
-                var inner = node.Arguments[1] ;
+                var inner = node.Arguments[1];
                 if (inner!.Type.GetGenericTypeDefinition() != typeof(MongoDbSet<>))
                 {
                     throw BuildException(node);
@@ -142,10 +148,68 @@ namespace MongoLinqs
 
 
                 var attached = ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
-                var outerKeySelector =  (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey = FixMemberName( ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
-                var innerKeySelector =  (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey =FixMemberName( ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var outerKey = FixMemberName(ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
+                var innerKey = FixMemberName(ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
+                var first = resultSelector!.Parameters[0].Name;
+                var second = resultSelector.Parameters[1].Name;
+                var temp = $"f_{Guid.NewGuid():n}";
+                var script = $@"
+                {{
+                    ""$lookup"": {{
+                        ""from"": ""{attached}"",
+                        ""localField"": ""{outerKey}"",
+                        ""foreignField"": ""{innerKey}"",  
+                        ""as"": ""{temp}""
+                    }}
+                }},
+                {{
+                    ""$unwind"": ""${temp}""
+                }},
+                {{
+                    ""$project"":{{
+                        ""{first}"" : ""$$ROOT"",
+                        ""{second}"":""${temp}""
+                    }}
+                }},
+                {{
+                    ""$project"":{{
+                        ""_id"":false,
+                        ""{first}.{temp}"": false
+                    }}
+                }}
+                ";
+                _steps.Add(script);
+            }
+            else
+            {
+                throw BuildException(node);
+            }
+        }
+
+        private const string GroupElements = "f_94af22dbce8645b6a8c97cc2f28a9fc7";
+
+        private void VisitGroupBy(MethodCallExpression node)
+        {
+            var pc = node.Method.GetParameters().Count();
+            if (pc < 3)
+            {
+                throw BuildException(node);
+            }
+            else if (pc == 3)
+            {
+                var source = node.Arguments[0];
+                Visit(source);
+                var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
+                var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+
+                var attached = ToCamelCase(keySelector.Type.GenericTypeArguments[0].Name);
+                var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var outerKey = FixMemberName(ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
+                var innerKey = FixMemberName(ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -200,13 +264,13 @@ namespace MongoLinqs
             {
                 var builder = new StringBuilder();
                 builder.Append("{\"$project\":{");
-                builder.Append(ProcessSelectNew(body));
+                builder.Append(VisitSelectNew(body));
                 builder.Append("}}");
                 _steps.Add(builder.ToString());
             }
             else if (body is MemberExpression)
             {
-                _steps.Add(ProcessSelectMember(body));
+                _steps.Add(VisitSelectMember(body));
             }
             else
             {
@@ -214,7 +278,12 @@ namespace MongoLinqs
             }
         }
 
-        private string ProcessSelectMember(Expression body)
+        private string VisitFieldsSelector(LambdaExpression lambda)
+        {
+            return "";
+        }
+        
+        private string VisitSelectMember(Expression body)
         {
             var builder = new StringBuilder();
             var member = body as MemberExpression;
@@ -228,7 +297,7 @@ namespace MongoLinqs
             return builder.ToString();
         }
 
-        private string ProcessSelectNew(Expression body)
+        private string VisitSelectNew(Expression body)
         {
             var sb = new StringBuilder();
             var newExp = body as NewExpression;
@@ -445,9 +514,5 @@ namespace MongoLinqs
         }
     }
 
-    public class MongoPipelineResult
-    {
-        public string StartAt { get; set; }
-        public string Pipeline { get; set; }
-    }
+  
 }
