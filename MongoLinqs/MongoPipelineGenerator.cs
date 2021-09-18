@@ -32,7 +32,7 @@ namespace MongoLinqs
 
         private void VisitStartCollection(ConstantExpression node)
         {
-            _startAt ??= ToCamelCase(node.Type.GenericTypeArguments[0].Name);
+            _startAt ??= NameHelper.ToCamelCase(node.Type.GenericTypeArguments[0].Name);
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -90,7 +90,7 @@ namespace MongoLinqs
                 }
 
 
-                var attached = ToCamelCase(secondarySetEx.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.ToCamelCase(secondarySetEx.Type.GenericTypeArguments[0].Name);
                 var resultSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -147,11 +147,11 @@ namespace MongoLinqs
                 }
 
 
-                var attached = ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey = FixMemberName(ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var outerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = FixMemberName(ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -205,11 +205,11 @@ namespace MongoLinqs
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
                 var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
 
-                var attached = ToCamelCase(keySelector.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.ToCamelCase(keySelector.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey = FixMemberName(ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var outerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = FixMemberName(ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -252,70 +252,37 @@ namespace MongoLinqs
             var source = node.Arguments[0];
             Visit(source);
             var selector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-            var param = selector!.Parameters[0];
-            var body = selector.Body;
-            if (param == body)
+            var selectorBuilder = new MongoSelectorBuilder(selector);
+            var result = selectorBuilder.Build();
+            if (result.Kind == MongoSelectorResultKind.Root)
             {
                 return;
             }
+            
+            if (result.Kind == MongoSelectorResultKind.Member )
+            {
+                var temp = $"f_{Guid.NewGuid():n}";
+                _steps.Add($"{{\"$project\":{{\"{temp}\":\"{result.Script}\"}}}}");
+                _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
+                return;
+            }
+            //
+            // if (result.Kind == MongoSelectorResultKind.Constant )
+            // {
+            //     var temp = $"f_{Guid.NewGuid():n}";
+            //     _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
+            //     _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
+            //     return;
+            // }
 
-
-            if (body is NewExpression)
+            if (result.Kind == MongoSelectorResultKind.New)
             {
-                var builder = new StringBuilder();
-                builder.Append("{\"$project\":{");
-                builder.Append(VisitSelectNew(body));
-                builder.Append("}}");
-                _steps.Add(builder.ToString());
+                _steps.Add($"{{\"$project\":{{{result.Script}}}}}");
+                return;
             }
-            else if (body is MemberExpression)
-            {
-                _steps.Add(VisitSelectMember(body));
-            }
-            else
-            {
-                throw BuildException(node);
-            }
+            throw BuildException(node);
         }
 
-        private string VisitFieldsSelector(LambdaExpression lambda)
-        {
-            return "";
-        }
-        
-        private string VisitSelectMember(Expression body)
-        {
-            var builder = new StringBuilder();
-            var member = body as MemberExpression;
-            var memberPath = GetMemberPath(member);
-            var script = @" {{
-                ""$replaceRoot"":{{
-                ""newRoot"":""${0}""
-            }}
-            }}";
-            builder.AppendFormat(script, memberPath);
-            return builder.ToString();
-        }
-
-        private string VisitSelectNew(Expression body)
-        {
-            var sb = new StringBuilder();
-            var newExp = body as NewExpression;
-            var length = newExp!.Constructor!.GetParameters().Length;
-            sb.Append("\"_id\":false");
-            for (int i = 0; i < length; i++)
-            {
-                sb.Append(",");
-
-                sb.Append('"' + ToCamelCase(newExp.Members![i].Name) + '"');
-                sb.Append(":");
-                var arg = newExp.Arguments[i] as MemberExpression;
-
-                sb.Append(VisitProperty(arg, true));
-            }
-
-            return sb.ToString();
-        }
 
         private string VisitCondition(Expression node)
         {
@@ -453,7 +420,7 @@ namespace MongoLinqs
             var current = member;
             do
             {
-                list.Insert(0, FixMemberName(ToCamelCase(current.Member.Name)));
+                list.Insert(0, NameHelper.FixMemberName(NameHelper.ToCamelCase(current.Member.Name)));
                 current = current.Expression as MemberExpression;
             } while (current != null);
 
@@ -461,10 +428,7 @@ namespace MongoLinqs
             return path;
         }
 
-        private static string FixMemberName(string memberName)
-        {
-            return memberName == "id" ? "_id" : memberName;
-        }
+  
 
         private void VisitWhere(MethodCallExpression node)
         {
@@ -482,12 +446,7 @@ namespace MongoLinqs
             _steps.Add(builder.ToString());
         }
 
-        private static string ToCamelCase(string s)
-        {
-            if (s == null) return null;
-            if (s == string.Empty) return s;
-            return s.Substring(0, 1).ToLower() + s.Substring(1);
-        }
+   
 
         public MongoPipelineResult Build()
         {

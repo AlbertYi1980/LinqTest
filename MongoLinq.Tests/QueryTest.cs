@@ -36,6 +36,34 @@ namespace MongoLinq.Tests
         }
 
         [Fact]
+        public void SelectConst()
+        {
+            var q = from s in _studentSet
+                select 1;
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+        [Fact]
+        public void SelectMember()
+        {
+            var q = from s in _studentSet
+                select s.Name;
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+        [Fact]
         public void SelectDirect()
         {
             var q = from s in _schoolSet
