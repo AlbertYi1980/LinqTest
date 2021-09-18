@@ -203,38 +203,14 @@ namespace MongoLinqs
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
                 var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-
-                var attached = NameHelper.ToCamelCase(keySelector.Type.GenericTypeArguments[0].Name);
-                var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
-                var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
-                var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
-                var first = resultSelector!.Parameters[0].Name;
-                var second = resultSelector.Parameters[1].Name;
-                var temp = $"f_{Guid.NewGuid():n}";
+                var keySelectorScript = new SelectorBuilder(keySelector).Build();
+                var elementSelectorScript = new SelectorBuilder(elementSelector).Build();
+                
                 var script = $@"
                 {{
-                    ""$lookup"": {{
-                        ""from"": ""{attached}"",
-                        ""localField"": ""{outerKey}"",
-                        ""foreignField"": ""{innerKey}"",  
-                        ""as"": ""{temp}""
-                    }}
-                }},
-                {{
-                    ""$unwind"": ""${temp}""
-                }},
-                {{
-                    ""$project"":{{
-                        ""{first}"" : ""$$ROOT"",
-                        ""{second}"":""${temp}""
-                    }}
-                }},
-                {{
-                    ""$project"":{{
-                        ""_id"":false,
-                        ""{first}.{temp}"": false
+                    ""$group"": {{
+                        ""_id"": {keySelectorScript.Script},
+                        ""{GroupElements}"": {elementSelectorScript.Script},
                     }}
                 }}
                 ";

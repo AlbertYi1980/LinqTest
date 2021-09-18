@@ -167,15 +167,15 @@ namespace MongoLinq.Tests
         [Fact]
         public void Group()
         {
-            // var q = from s in _studentSet
-            //     group s.Name by s.SchoolId
-            //     into g
-            //     select new {SchoolId = g.Key, Stats = new {Count = g.Count()}};
-            // var list = q.ToList();
-            // foreach (var item in list)
-            // {
-            //     _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
-            // }
+            var q = from s in _studentSet
+                group s.Name by s.SchoolId
+                into g
+                select new {SchoolId = g.Key, Stats = new {Count = g.Count()}};
+            var list = q.ToList();
+            foreach (var item in list)
+            {
+                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+            }
         }
 
         [Fact]
