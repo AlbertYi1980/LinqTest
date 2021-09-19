@@ -62,10 +62,16 @@ namespace MongoLinqs
                 VisitJoin(node);
                 return node;
             }
-            
+
             if (node.Method.Name == nameof(Enumerable.GroupBy))
             {
                 VisitGroupBy(node);
+                return node;
+            }
+
+            if (node.Method.Name == nameof(Enumerable.GroupJoin))
+            {
+                VisitGroupJoin(node);
                 return node;
             }
 
@@ -147,11 +153,16 @@ namespace MongoLinqs
                 {
                     throw BuildException(node);
                 }
+
                 var attached = NameHelper.ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var outerKey =
+                    NameHelper.FixMemberName(
+                        NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = NameHelper.FixMemberName(NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKey =
+                    NameHelper.FixMemberName(
+                        NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -189,7 +200,6 @@ namespace MongoLinqs
             }
         }
 
-       
 
         private void VisitGroupBy(MethodCallExpression node)
         {
@@ -198,14 +208,14 @@ namespace MongoLinqs
             {
                 throw BuildException(node);
             }
-            else if ( pc == 2)
+            else if (pc == 2)
             {
                 var source = node.Arguments[0];
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
                 var keySelectorScript = new SelectorBuilder(keySelector).Build();
-               
-                
+
+
                 var script = $@"
                 {{
                     ""$group"": {{
@@ -216,15 +226,15 @@ namespace MongoLinqs
                 ";
                 _steps.Add(script);
             }
-            else if ( pc == 3)
+            else if (pc == 3)
             {
                 var source = node.Arguments[0];
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-                var elementSelector =  (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var keySelectorScript = new SelectorBuilder(keySelector).Build();
                 var elementSelectorScript = new SelectorBuilder(elementSelector).Build();
-                
+
                 var script = $@"
                 {{
                     ""$group"": {{
@@ -234,6 +244,57 @@ namespace MongoLinqs
                 }}
                 ";
                 _steps.Add(script);
+            }
+            else
+            {
+                throw BuildException(node);
+            }
+        }
+
+
+        private void VisitGroupJoin(MethodCallExpression node)
+        {
+            var pc = node.Method.GetParameters().Count();
+            if (pc < 5)
+            {
+                throw BuildException(node);
+            }
+            else if (pc == 5)
+            {
+                var outer = node.Arguments[0];
+                Visit(outer);
+                var inner = node.Arguments[1];
+                if (inner!.Type.GetGenericTypeDefinition() != typeof(MongoDbSet<>))
+                {
+                    throw BuildException(node);
+                }
+
+                var attached = NameHelper.ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
+                var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
+                var outerKey =
+                    NameHelper.FixMemberName(
+                        NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
+                var innerKey =
+                    NameHelper.FixMemberName(
+                        NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
+                var result = new SelectorBuilder(resultSelector).Build();
+                var first = resultSelector!.Parameters[0].Name;
+                var second = resultSelector.Parameters[1].Name;
+                var temp = GroupHelper.GroupElements;
+                var script = $@"
+                {{
+                    ""$lookup"": {{
+                        ""from"": ""{attached}"",
+                        ""localField"": ""{outerKey}"",
+                        ""foreignField"": ""{innerKey}"",  
+                        ""as"": ""{temp}""
+                    }}
+                }}
+                ";
+                _steps.Add(script);
+                _steps.Add($"{{\"$project\":{result.Script}}}");
             }
             else
             {
@@ -252,16 +313,16 @@ namespace MongoLinqs
             {
                 return;
             }
-            
-            if (result.Kind == SelectorResultKind.Member )
+
+            if (result.Kind == SelectorResultKind.Member)
             {
                 var temp = $"f_{Guid.NewGuid():n}";
                 _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
                 _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
                 return;
             }
-            
-            if (result.Kind == SelectorResultKind.Constant )
+
+            if (result.Kind == SelectorResultKind.Constant)
             {
                 var temp = $"f_{Guid.NewGuid():n}";
                 _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
@@ -274,6 +335,7 @@ namespace MongoLinqs
                 _steps.Add($"{{\"$project\":{result.Script}}}");
                 return;
             }
+
             throw BuildException(node);
         }
 
@@ -294,14 +356,13 @@ namespace MongoLinqs
             builder.Append("{");
             builder.Append("\"$match\":");
             var lambda = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-            
+
             var result = new ConditionBuilder(lambda).Build();
             builder.Append(result);
             builder.Append("}");
             _steps.Add(builder.ToString());
         }
 
-   
 
         public MongoPipelineResult Build()
         {
@@ -327,6 +388,4 @@ namespace MongoLinqs
             });
         }
     }
-
-  
 }

@@ -73,7 +73,7 @@ namespace MongoLinqs.Selectors
 
             if (current is MethodCallExpression call)
             {
-                if (!GroupHelper.IsGroupCall(call))
+                if (!GroupHelper.IsGroupCall(call) && !GroupHelper.IsEnumCall(call))
                 {
                     throw new NotSupportedException();
                 }

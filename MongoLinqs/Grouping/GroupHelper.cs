@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace MongoLinqs.Grouping
@@ -16,6 +17,17 @@ namespace MongoLinqs.Grouping
             var type = arguments[0].Type;
             if (!type.IsGenericType) return false;
             return type.GetGenericTypeDefinition() == typeof(IGrouping<,>);
+        }
+        
+        public static bool IsEnumCall(MethodCallExpression call)
+        {
+            var method = call.Method;
+            if (!method.IsStatic) return false;
+            var arguments = call.Arguments;
+            if (arguments.Count < 1) return false;
+            var type = arguments[0].Type;
+            if (!type.IsGenericType) return false;
+            return type.GetGenericTypeDefinition() == typeof(IEnumerable<>);
         }
         
         public static bool IsGroupMember(MemberExpression member)
