@@ -6,7 +6,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\MongoDbAccessor\MongoDbAccessor.csproj" />
       <ProjectReference Include="..\MongoLinqs\MongoLinqs.csproj" />
     </ItemGroup>
 

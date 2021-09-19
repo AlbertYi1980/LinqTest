@@ -6,13 +6,22 @@ using System.Reflection;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
-using MongoDbAccessor;
+using MongoLinqs.Pipelines;
 using Newtonsoft.Json;
 
 namespace MongoLinqs
 {
     public class MongoQueryProvider : IQueryProvider
     {
+        private readonly string _connectionString;
+        private readonly string _db;
+
+        public MongoQueryProvider(string connectionString, string db)
+        {
+            _connectionString = connectionString;
+            _db = db;
+        }
+        
         public IQueryable CreateQuery(Expression expression)
         {
             throw new NotImplementedException();
@@ -83,9 +92,14 @@ namespace MongoLinqs
 
         private IMongoCollection<BsonDocument> GetCollection(string collectionName)
         {
-            var client = MongoDbHelper.GetClient();
-            var db = client.GetDatabase("linq_test");
+            var db = GetDb(_connectionString, _db);
             return db.GetCollection<BsonDocument>(collectionName);
+        }
+        
+        private static IMongoDatabase GetDb(string connectionString, string db)
+        {
+            var settings = MongoClientSettings.FromConnectionString(connectionString);
+            return new MongoClient(settings).GetDatabase(db);
         }
     }
 }

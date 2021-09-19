@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
-using MongoLinqs.Grouping;
+using MongoLinqs.Pipelines.Grouping;
 
-namespace MongoLinqs.MemberPath
+namespace MongoLinqs.Pipelines.MemberPath
 {
     public static class MemberAccessHelper
     {

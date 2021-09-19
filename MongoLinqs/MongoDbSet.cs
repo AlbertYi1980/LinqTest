@@ -8,9 +8,9 @@ namespace MongoLinqs
 {
     public class MongoDbSet<TElement> : IQueryable<TElement>
     {
-        public MongoDbSet()
+        public MongoDbSet(string connectionString, string db)
         {
-            Provider = new MongoQueryProvider();
+            Provider = new MongoQueryProvider(connectionString, db);
             Expression = Expression.Constant(this);
         }
 

@@ -1,4 +1,4 @@
-﻿namespace MongoLinqs.Selectors
+﻿namespace MongoLinqs.Pipelines.Selectors
 {
     public class SelectorResult
     {

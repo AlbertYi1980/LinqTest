@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using MongoLinqs.Grouping;
-using MongoLinqs.MemberPath;
+using MongoLinqs.Pipelines.Grouping;
+using MongoLinqs.Pipelines.MemberPath;
 using Newtonsoft.Json;
 
-namespace MongoLinqs.Selectors
+namespace MongoLinqs.Pipelines.Selectors
 {
     public class SelectorBuilder
     {

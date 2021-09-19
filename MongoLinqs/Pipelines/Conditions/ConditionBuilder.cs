@@ -2,10 +2,10 @@
 using System.Linq.Expressions;
 using System.Text;
 using System.Text.RegularExpressions;
-using MongoLinqs.MemberPath;
+using MongoLinqs.Pipelines.MemberPath;
 using Newtonsoft.Json;
 
-namespace MongoLinqs.Conditions
+namespace MongoLinqs.Pipelines.Conditions
 {
     public class ConditionBuilder
     {

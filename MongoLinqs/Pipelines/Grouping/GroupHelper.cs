@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Linq.Expressions;
 
-namespace MongoLinqs.Grouping
+namespace MongoLinqs.Pipelines.Grouping
 {
     public static class GroupHelper
     {

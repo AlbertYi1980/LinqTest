@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using MongoLinqs;
-using MongoLinqs.Grouping;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -17,8 +16,13 @@ namespace MongoLinq.Tests
         public QueryTest(ITestOutputHelper testOutputHelper)
         {
             _testOutputHelper = testOutputHelper;
-            _studentSet = new MongoDbSet<Student>();
-            _schoolSet = new MongoDbSet<School>();
+            var password = "3#yab@c";
+            var defaultDb = "local";
+            var connectionString = $"mongodb+srv://albert:{Uri.EscapeDataString(password)}@cluster0.0qbsz.mongodb.net/{defaultDb}?retryWrites=true&w=majority";
+            var db = "linq_test";
+            var context = new MongoDbContext(connectionString, db);
+            _studentSet = context.Set<Student>();
+            _schoolSet = context.Set<School>();
         }
 
 

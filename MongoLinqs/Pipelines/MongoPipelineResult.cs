@@ -1,4 +1,4 @@
-﻿namespace MongoLinqs
+﻿namespace MongoLinqs.Pipelines
 {
     public class MongoPipelineResult
     {

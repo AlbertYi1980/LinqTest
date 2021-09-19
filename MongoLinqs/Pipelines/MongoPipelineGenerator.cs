@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
-using MongoLinqs.Conditions;
-using MongoLinqs.Grouping;
-using MongoLinqs.Selectors;
+using MongoLinqs.Pipelines.Conditions;
+using MongoLinqs.Pipelines.Grouping;
+using MongoLinqs.Pipelines.Selectors;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MongoLinqs
+namespace MongoLinqs.Pipelines
 {
     public class MongoPipelineGenerator : ExpressionVisitor
     {
