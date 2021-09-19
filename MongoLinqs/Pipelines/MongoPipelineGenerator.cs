@@ -13,11 +13,13 @@ namespace MongoLinqs.Pipelines
 {
     public class MongoPipelineGenerator : ExpressionVisitor
     {
+        private readonly ILogger _logger;
         private string _startAt;
         private readonly List<string> _steps;
 
-        public MongoPipelineGenerator()
+        public MongoPipelineGenerator(ILogger logger)
         {
+            _logger = logger;
             _steps = new List<string>();
         }
 
@@ -368,10 +370,10 @@ namespace MongoLinqs.Pipelines
         {
             var pipeline = $"[{string.Join(",", _steps)}]";
             pipeline = FormatPipeline(pipeline);
-            Console.WriteLine();
-            Console.WriteLine("Pipe line:");
-            Console.WriteLine(pipeline);
-            Console.WriteLine();
+            _logger.WriteLine();
+            _logger.WriteLine("Pipe line:");
+            _logger.WriteLine(pipeline);
+            _logger.WriteLine();
             return new MongoPipelineResult()
             {
                 StartAt = _startAt,

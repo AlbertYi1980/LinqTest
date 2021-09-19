@@ -15,11 +15,13 @@ namespace MongoLinqs
     {
         private readonly string _connectionString;
         private readonly string _db;
+        private readonly ILogger _logger;
 
-        public MongoQueryProvider(string connectionString, string db)
+        public MongoQueryProvider(string connectionString, string db, ILogger logger)
         {
             _connectionString = connectionString;
             _db = db;
+            _logger = logger;
         }
         
         public IQueryable CreateQuery(Expression expression)
@@ -42,7 +44,7 @@ namespace MongoLinqs
             if (typeof(TResult).GetGenericTypeDefinition() == typeof(IEnumerable<>))
             {
                 var elementType = typeof(TResult).GenericTypeArguments.First();
-                var pipelineGenerator = new MongoPipelineGenerator();
+                var pipelineGenerator = new MongoPipelineGenerator(_logger);
                 pipelineGenerator.Visit(expression);   
                 var pipelineResult = pipelineGenerator.Build();
                 var collection = GetCollection(pipelineResult.StartAt);
@@ -53,10 +55,10 @@ namespace MongoLinqs
                 var pipelineDefinition =  PipelineDefinition<BsonDocument, BsonDocument>.Create(stages);
                 var result = collection.Aggregate(pipelineDefinition).ToList();
                 var json = result.ToJson();
-                Console.WriteLine();
-                Console.WriteLine("Raw json:");
-                Console.WriteLine(json);
-                Console.WriteLine();
+                _logger.WriteLine();
+                _logger.WriteLine("Raw json:");
+                _logger.WriteLine(json);
+                _logger.WriteLine();
                 return (TResult)Deserialize(elementType, result);
             }
             else

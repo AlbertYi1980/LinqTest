@@ -9,18 +9,18 @@ namespace MongoLinq.Tests
 {
     public class QueryTest
     {
-        private readonly ITestOutputHelper _testOutputHelper;
         readonly MongoDbSet<Student> _studentSet;
         readonly MongoDbSet<School> _schoolSet;
+        private readonly TestLogger _logger;
 
         public QueryTest(ITestOutputHelper testOutputHelper)
         {
-            _testOutputHelper = testOutputHelper;
             var password = "3#yab@c";
             var defaultDb = "local";
             var connectionString = $"mongodb+srv://albert:{Uri.EscapeDataString(password)}@cluster0.0qbsz.mongodb.net/{defaultDb}?retryWrites=true&w=majority";
             var db = "linq_test";
-            var context = new MongoDbContext(connectionString, db);
+            _logger = new TestLogger(testOutputHelper);
+            var context = new MongoDbContext(connectionString, db, _logger);
             _studentSet = context.Set<Student>();
             _schoolSet = context.Set<School>();
         }
@@ -37,7 +37,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -52,7 +52,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -66,7 +66,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -80,7 +80,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -94,7 +94,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -109,7 +109,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -123,7 +123,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -137,7 +137,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -151,7 +151,7 @@ namespace MongoLinq.Tests
             var list = q.ToList();
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -165,7 +165,7 @@ namespace MongoLinq.Tests
             var list = q.ToList();
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -179,7 +179,7 @@ namespace MongoLinq.Tests
             var list = q.ToList();
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -194,7 +194,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -209,7 +209,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
         
@@ -224,7 +224,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
 
@@ -239,7 +239,7 @@ namespace MongoLinq.Tests
 
             foreach (var item in list)
             {
-                _testOutputHelper.WriteLine(JsonConvert.SerializeObject(item));
+                _logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
     }
