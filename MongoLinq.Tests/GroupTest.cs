@@ -148,22 +148,5 @@ namespace MongoLinq.Tests
         }
 
 
-        [Fact]
-        public void GroupJoin3()
-        {
-            var q = SchoolSet
-                .GroupJoin(StudentSet, school => school.Id, student => student.SchoolId,
-                    (school, g) => new {school, g})
-                .SelectMany(@t => StudentSet,
-                    (@t, student1) => new {SchoolName = @t.school.Name, StudentCount = @t.g.Count()});
-
-
-            var list = q.ToList();
-
-            foreach (var item in list)
-            {
-                Logger.WriteLine(JsonConvert.SerializeObject(item));
-            }
-        }
     }
 }

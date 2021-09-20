@@ -1,6 +1,5 @@
 ﻿using System.Linq;
 using MongoLinq.Tests.Common;
-using MongoLinq.Tests.Entities;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;
@@ -41,6 +40,22 @@ namespace MongoLinq.Tests
           
             var q2 = StudentSet.GroupBy(s => s.SchoolId, s => s.Name)
                 .Select(g => new {SchoolId = g.Key, Stats = new {Count = g.Count()},});
+            
+            var list = q.ToList();
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void GroupCount3()
+        {
+            var q = from s in StudentSet
+                group s.Name by s.SchoolId into g
+                select new {SchoolId = g.Key, Count = g.Count() };
+          
+      
             
             var list = q.ToList();
             foreach (var item in list)
