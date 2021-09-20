@@ -16,7 +16,7 @@ namespace MongoLinqs.Serialization
             foreach (var property in properties)
             {
                 var propertyName = property.Name;
-                destination.Add(NameHelper.Map( propertyName), property.Value);
+                destination.Add(NameHelper.MapEntity( propertyName), property.Value);
             }
      
             destination.WriteTo(writer);
@@ -31,7 +31,7 @@ namespace MongoLinqs.Serialization
             foreach (var property in properties)
             {
                 var propertyName = property.Name;
-                destination.Add(NameHelper.InverseMap( propertyName), property.Value);
+                destination.Add(NameHelper.InverseMapEntity( propertyName), property.Value);
             }
             return destination.ToObject(objectType);
         }

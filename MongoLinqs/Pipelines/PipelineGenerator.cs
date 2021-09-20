@@ -36,7 +36,7 @@ namespace MongoLinqs.Pipelines
 
         private void VisitStartCollection(ConstantExpression node)
         {
-            _startAt ??= NameHelper.Map(node.Type.GenericTypeArguments[0].Name);
+            _startAt ??= NameHelper.MapCollection(node.Type.GenericTypeArguments[0].Name);
         }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
@@ -100,7 +100,7 @@ namespace MongoLinqs.Pipelines
                 }
 
 
-                var attached = NameHelper.Map(secondarySetEx.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.MapCollection(secondarySetEx.Type.GenericTypeArguments[0].Name);
                 var resultSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
@@ -156,7 +156,7 @@ namespace MongoLinqs.Pipelines
                     throw BuildException(node);
                 }
 
-                var attached = NameHelper.Map(inner.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.MapCollection(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
          
                 var outerKey =new SelectorBuilder(outerKeySelector,false).Build();
@@ -277,13 +277,13 @@ namespace MongoLinqs.Pipelines
                     throw BuildException(node);
                 }
 
-                var attached = NameHelper.Map(inner.Type.GenericTypeArguments[0].Name);
+                var attached = NameHelper.MapCollection(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var outerKey =
-                    NameHelper.Map((outerKeySelector!.Body as MemberExpression)!.Member.Name);
+                    NameHelper.MapMember((outerKeySelector!.Body as MemberExpression)!.Member);
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
                 var innerKey =
-                    NameHelper.Map((innerKeySelector!.Body as MemberExpression)!.Member.Name);
+                    NameHelper.MapMember((innerKeySelector!.Body as MemberExpression)!.Member);
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var result = new SelectorBuilder(resultSelector).Build();
                 var first = resultSelector!.Parameters[0].Name;

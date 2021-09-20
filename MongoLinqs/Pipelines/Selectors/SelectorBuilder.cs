@@ -42,7 +42,8 @@ namespace MongoLinqs.Pipelines.Selectors
                 case MethodCallExpression call:
                     if (!AgHelper.IsAggregating(call)) throw new NotSupportedException();
                     return AgHelper.BuildFunctions(call, _params);
-                default: throw new NotSupportedException();
+                 default:
+                     throw new NotSupportedException();
             }
         }
 
@@ -72,14 +73,14 @@ namespace MongoLinqs.Pipelines.Selectors
 
                 if (expression is NewExpression @new)
                 {
-                    name = NameHelper.Map(@new.Members![i].Name);
+                    name = NameHelper.MapMember(@new.Members![i]);
                     value = BuildCore(@new.Arguments[i]);
                 }
                 else if (expression is MemberInitExpression memberInit)
                 {
                     var assignment = (MemberAssignment) memberInit.Bindings[i];
 
-                    name = NameHelper.Map(assignment.Member.Name);
+                    name = NameHelper.MapMember(assignment.Member);
 
                     value = BuildCore(assignment.Expression);
                 }

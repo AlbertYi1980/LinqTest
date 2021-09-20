@@ -23,11 +23,11 @@ namespace MongoLinqs.Serialization
                 var propertyName = property.Name;
                  if (SystemPropertyNames.Contains(propertyName))
                 {
-                    destination.Add(NameHelper.Map(propertyName), property.Value);
+                    destination.Add(NameHelper.MapEntity(propertyName), property.Value);
                 }
                 else
                 {
-                    data.Add(NameHelper.Map(propertyName), property.Value);
+                    data.Add(NameHelper.MapEntity(propertyName), property.Value);
                 }
             }
             destination.Add("data", data);
@@ -44,16 +44,16 @@ namespace MongoLinqs.Serialization
             foreach (var property in properties)
             {
                 var propertyName = property.Name;
-                if (SystemPropertyNames.Contains(NameHelper.InverseMap( propertyName)))
+                if (SystemPropertyNames.Contains(NameHelper.InverseMapEntity( propertyName)))
                 {
-                    destination.Add(NameHelper.InverseMap(propertyName), property.Value);
+                    destination.Add(NameHelper.InverseMapEntity(propertyName), property.Value);
                 }
                 else if (propertyName == "data")
                 {
                     var innerProperties = data!.Properties();
                     foreach (var innerProperty in innerProperties)
                     {
-                         destination.Add(NameHelper.InverseMap(innerProperty.Name), innerProperty.Value);
+                         destination.Add(NameHelper.InverseMapEntity(innerProperty.Name), innerProperty.Value);
                     }
                 }
             }

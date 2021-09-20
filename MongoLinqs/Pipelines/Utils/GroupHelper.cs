@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace MongoLinqs.Pipelines.Utils
 {
@@ -30,10 +31,10 @@ namespace MongoLinqs.Pipelines.Utils
             return type.GetGenericTypeDefinition() == typeof(IEnumerable<>);
         }
         
-        public static bool IsGroupMember(MemberExpression member)
+        public static bool IsGroupMember(MemberInfo member)
         {
-            var type = member.Expression!.Type;
-            if (!type.IsGenericType) return false;
+            var type = member.ReflectedType;
+            if (!type!.IsGenericType) return false;
             return type.GetGenericTypeDefinition() == typeof(IGrouping<,>);
         }
         

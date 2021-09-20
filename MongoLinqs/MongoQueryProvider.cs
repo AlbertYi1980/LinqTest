@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -9,6 +10,7 @@ using MongoDB.Driver;
 using MongoLinqs.Pipelines;
 using MongoLinqs.Serialization;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 
 namespace MongoLinqs
 {
@@ -17,6 +19,12 @@ namespace MongoLinqs
         private readonly string _connectionString;
         private readonly string _db;
         private readonly ILogger _logger;
+
+        private static readonly JsonSerializerSettings SerializerSettings = new()
+        {
+            Converters = new Collection<JsonConverter>() {new DefaultJsonConverter()},
+            ContractResolver = new CamelCasePropertyNamesContractResolver()
+        };
 
         public MongoQueryProvider(string connectionString, string db, ILogger logger)
         {
@@ -80,10 +88,8 @@ namespace MongoLinqs
             foreach (var document in documents)
             {
                 var json = document.ToString();
-                yield return JsonConvert.DeserializeObject<TElement>(json, new DefaultJsonConverter());
+                yield return JsonConvert.DeserializeObject<TElement>(json, SerializerSettings);
             }
-            
-            
         }
 
         private IMongoCollection<BsonDocument> GetCollection(string collectionName)
