@@ -158,43 +158,49 @@ namespace MongoLinqs.Pipelines
 
                 var attached = NameHelper.ToCamelCase(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var outerKey =
-                    NameHelper.FixMemberName(
-                        NameHelper.ToCamelCase((outerKeySelector!.Body as MemberExpression)!.Member.Name));
+         
+                var outerKey =new SelectorBuilder(outerKeySelector,false).Build();
+                  
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey =
-                    NameHelper.FixMemberName(
-                        NameHelper.ToCamelCase((innerKeySelector!.Body as MemberExpression)!.Member.Name));
+                var innerKey = new SelectorBuilder(innerKeySelector, false).Build();
+          
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
+                var resultSelectorScript = new SelectorBuilder(resultSelector).Build();
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
                 var temp = NameHelper.GetTempField();
-                var script = $@"
+
+                _steps.Add($@"
                 {{
                     ""$lookup"": {{
                         ""from"": ""{attached}"",
-                        ""localField"": ""{outerKey}"",
-                        ""foreignField"": ""{innerKey}"",  
+                        ""localField"": {outerKey},
+                        ""foreignField"": {innerKey},  
                         ""as"": ""{temp}""
                     }}
-                }},
+                }}
+                ");
+                _steps.Add($@"
                 {{
                     ""$unwind"": ""${temp}""
-                }},
-                {{
-                    ""$project"":{{
-                        ""{first}"" : ""$$ROOT"",
-                        ""{second}"":""${temp}""
-                    }}
-                }},
+                }}
+                ");
+                
+                _steps.Add($@"
                 {{
                     ""$project"":{{
                         ""_id"":false,
-                        ""{first}.{temp}"": false
+                        ""{first}"" : ""$$ROOT"",
+                        ""{second}"":""${temp}""
                     }}
                 }}
-                ";
-                _steps.Add(script);
+                "); 
+                _steps.Add($@"
+                {{
+                    ""$project"":{resultSelectorScript}
+                }}
+                ");
+          
             }
             else
             {

@@ -22,7 +22,12 @@ namespace MongoLinqs.Pipelines.AgMethods
 
             if (call.Method.Name == nameof(Enumerable.Average))
             {
-                return BuildAverage(call, @params);
+                return BuildCommon("$avg",call, @params);
+            }
+            
+            if (call.Method.Name == nameof(Enumerable.Sum))
+            {
+                return BuildCommon("$sum",  call, @params);
             }
 
             throw new NotSupportedException();
@@ -39,16 +44,7 @@ namespace MongoLinqs.Pipelines.AgMethods
 
             return $"{{\"$size\":\"${path}\"}}";
         }
-
-        private static string BuildAverage(MethodCallExpression call, IList<Expression> @params)
-        {
-            return BuildCommon("$avg",call, @params);
-        }
         
-        private static string BuildSum(MethodCallExpression call, IList<Expression> @params)
-        {
-            return BuildCommon("$sum",call, @params);
-        }
 
         private static string BuildCommon(string @operator, MethodCallExpression call, IList<Expression> @params)
         {

@@ -10,11 +10,13 @@ namespace MongoLinqs.Pipelines.Selectors
 {
     public class SelectorBuilder
     {
+        private readonly bool _isRef;
         private readonly Expression _body;
         private readonly IList<Expression> _params;
 
-        public SelectorBuilder(LambdaExpression selector)
+        public SelectorBuilder(LambdaExpression selector, bool isRef = true)
         {
+            _isRef = isRef;
             _body = selector.Body;
             _params = selector.Parameters.Cast<Expression>().ToList();
         }
@@ -30,7 +32,8 @@ namespace MongoLinqs.Pipelines.Selectors
             {
                 case ParameterExpression:
                 case MemberExpression:
-                    return $"\"${PathAccessHelper.GetPath(current, _params)}\"";
+                    var prefix = _isRef ? "$" : string.Empty;
+                    return $"\"{prefix}{PathAccessHelper.GetPath(current, _params)}\"";
                 case NewExpression:
                 case MemberInitExpression:
                     return BuildNew(current);
