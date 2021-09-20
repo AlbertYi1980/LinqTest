@@ -1,5 +1,8 @@
-﻿namespace MongoLinq.Tests.Entities
+﻿using MongoLinq.Tests.Common;
+
+namespace MongoLinq.Tests.Entities
 {
+    [Entity]
     public class School
     {
         public int Id { get; set; }
