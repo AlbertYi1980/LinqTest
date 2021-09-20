@@ -7,6 +7,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using MongoLinqs.Pipelines;
+using MongoLinqs.Serialization;
 using Newtonsoft.Json;
 
 namespace MongoLinqs
@@ -78,15 +79,8 @@ namespace MongoLinqs
         {
             foreach (var document in documents)
             {
-                if (document.Contains("_id"))
-                {
-                    var idValue = document["_id"];
-                    document.Remove("_id");
-                    document["id"] = idValue;
-                }
-
                 var json = document.ToString();
-                yield return JsonConvert.DeserializeObject<TElement>(json);
+                yield return JsonConvert.DeserializeObject<TElement>(json, new DefaultJsonConverter());
             }
             
             

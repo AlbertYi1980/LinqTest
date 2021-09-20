@@ -1,18 +1,16 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Microsoft.VisualBasic;
-using MongoLinq.Tests.Common;
+using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MongoLinq.Tests.Serialization
+namespace MongoLinqs.Serialization
 {
     public class MirrorJsonConverter : JsonConverter
     {
-        private const string IdPropertyName = "Id";
-        private static readonly string[] OtherSystemPropertyNames = {"CreateAt"};
+  
+        private static readonly string[] SystemPropertyNames = {"Id", "CreateAt"};
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
@@ -23,17 +21,13 @@ namespace MongoLinq.Tests.Serialization
             foreach (var property in properties)
             {
                 var propertyName = property.Name;
-                if (propertyName == IdPropertyName)
+                 if (SystemPropertyNames.Contains(propertyName))
                 {
-                    destination.Add("_id", property.Value);
-                }
-                else if (OtherSystemPropertyNames.Contains(propertyName))
-                {
-                    destination.Add(ToCamelCase(propertyName), property.Value);
+                    destination.Add(NameHelper.Map(propertyName), property.Value);
                 }
                 else
                 {
-                    data.Add(ToCamelCase(propertyName), property.Value);
+                    data.Add(NameHelper.Map(propertyName), property.Value);
                 }
             }
             destination.Add("data", data);
@@ -50,20 +44,16 @@ namespace MongoLinq.Tests.Serialization
             foreach (var property in properties)
             {
                 var propertyName = property.Name;
-                if (propertyName == "_id")
+                if (SystemPropertyNames.Contains(NameHelper.InverseMap( propertyName)))
                 {
-                    destination.Add(IdPropertyName, property.Value);
-                }
-                else if (OtherSystemPropertyNames.Contains(ToPascalCase( propertyName)))
-                {
-                    destination.Add(ToPascalCase(propertyName), property.Value);
+                    destination.Add(NameHelper.InverseMap(propertyName), property.Value);
                 }
                 else if (propertyName == "data")
                 {
                     var innerProperties = data!.Properties();
                     foreach (var innerProperty in innerProperties)
                     {
-                         destination.Add(ToPascalCase(innerProperty.Name), innerProperty.Value);
+                         destination.Add(NameHelper.InverseMap(innerProperty.Name), innerProperty.Value);
                     }
                 }
             }
@@ -74,20 +64,6 @@ namespace MongoLinq.Tests.Serialization
         public override bool CanConvert(Type objectType)
         {
             return objectType.GetCustomAttribute<EntityAttribute>() != null;
-        }
-
-        private static string ToCamelCase(string s)
-        {
-            if (s == null) return null;
-            if (s == string.Empty) return s;
-            return s.Substring(0, 1).ToLower() + s.Substring(1);
-        }
-        
-        private static string ToPascalCase(string s)
-        {
-            if (s == null) return null;
-            if (s == string.Empty) return s;
-            return s.Substring(0, 1).ToUpper() + s.Substring(1);
         }
     }
 }

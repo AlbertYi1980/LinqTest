@@ -72,14 +72,14 @@ namespace MongoLinqs.Pipelines.Selectors
 
                 if (expression is NewExpression @new)
                 {
-                    name = NameHelper.ToCamelCase(@new.Members![i].Name);
+                    name = NameHelper.Map(@new.Members![i].Name);
                     value = BuildCore(@new.Arguments[i]);
                 }
                 else if (expression is MemberInitExpression memberInit)
                 {
                     var assignment = (MemberAssignment) memberInit.Bindings[i];
 
-                    name = NameHelper.ToCamelCase(assignment.Member.Name);
+                    name = NameHelper.Map(assignment.Member.Name);
 
                     value = BuildCore(assignment.Expression);
                 }

@@ -1,4 +1,5 @@
 ﻿using MongoLinq.Tests.Common;
+using MongoLinqs;
 
 namespace MongoLinq.Tests.Entities
 {

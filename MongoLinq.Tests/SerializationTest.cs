@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.ObjectModel;
-using MongoLinq.Tests.Common;
-using MongoLinq.Tests.Serialization;
+using MongoLinqs;
+using MongoLinqs.Serialization;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;

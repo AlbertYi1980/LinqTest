@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace MongoLinq.Tests.Common
+namespace MongoLinqs
 {
     public class EntityAttribute : Attribute
     {

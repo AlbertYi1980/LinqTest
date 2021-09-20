@@ -22,7 +22,7 @@ namespace MongoLinqs.Pipelines.Utils
                     case ParameterExpression leading:
                         if (@params.Count > 1)
                         {
-                            var segment = NameHelper.ToCamelCase(leading!.Name);
+                            var segment = NameHelper.Map(leading!.Name);
                             list.Insert(0, segment);
                         }
                         else
@@ -37,7 +37,7 @@ namespace MongoLinqs.Pipelines.Utils
                         current = null;
                         break;
                     case MemberExpression member:
-                        var memberName = NameHelper.FixMemberName(NameHelper.ToCamelCase(member.Member.Name));
+                        var memberName = NameHelper.Map(member.Member.Name);
                         if (GroupHelper.IsGroupMember(member) && memberName == "key")
                         {
                             memberName = "_id";
