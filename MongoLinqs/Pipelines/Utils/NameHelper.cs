@@ -1,4 +1,6 @@
-﻿namespace MongoLinqs.Pipelines
+﻿using System;
+
+namespace MongoLinqs.Pipelines.Utils
 {
     public static class NameHelper
     {
@@ -13,5 +15,11 @@
             if (s == string.Empty) return s;
             return s.Substring(0, 1).ToLower() + s.Substring(1);
         }
+        
+        public static string GetTempField()
+        {
+            return $"f_{Guid.NewGuid():n}";
+        }
+        
     }
 }

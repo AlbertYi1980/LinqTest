@@ -1,4 +1,4 @@
-﻿namespace MongoLinq.Tests
+﻿namespace MongoLinq.Tests.Common
 {
     public class Student
     {

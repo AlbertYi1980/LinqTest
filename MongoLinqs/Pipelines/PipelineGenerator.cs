@@ -4,20 +4,20 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using MongoLinqs.Pipelines.Conditions;
-using MongoLinqs.Pipelines.Grouping;
 using MongoLinqs.Pipelines.Selectors;
+using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace MongoLinqs.Pipelines
 {
-    public class MongoPipelineGenerator : ExpressionVisitor
+    public class PipelineGenerator : ExpressionVisitor
     {
         private readonly ILogger _logger;
         private string _startAt;
         private readonly List<string> _steps;
 
-        public MongoPipelineGenerator(ILogger logger)
+        public PipelineGenerator(ILogger logger)
         {
             _logger = logger;
             _steps = new List<string>();
@@ -104,7 +104,7 @@ namespace MongoLinqs.Pipelines
                 var resultSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
-                var temp = $"f_{Guid.NewGuid():n}";
+                var temp = NameHelper.GetTempField();
                 var script = $@"
                 {{
                     ""$lookup"": {{
@@ -168,7 +168,7 @@ namespace MongoLinqs.Pipelines
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
-                var temp = $"f_{Guid.NewGuid():n}";
+                var temp = NameHelper.GetTempField();
                 var script = $@"
                 {{
                     ""$lookup"": {{
@@ -221,7 +221,7 @@ namespace MongoLinqs.Pipelines
                 var script = $@"
                 {{
                     ""$group"": {{
-                        ""_id"": {keySelectorScript.Script},
+                        ""_id"": {keySelectorScript},
                         ""{GroupHelper.GroupElements}"":{{""$push"":""$$ROOT""}},
                     }}
                 }}
@@ -240,8 +240,8 @@ namespace MongoLinqs.Pipelines
                 var script = $@"
                 {{
                     ""$group"": {{
-                        ""_id"": {keySelectorScript.Script},
-                        ""{GroupHelper.GroupElements}"":{{""$push"":{elementSelectorScript.Script}}},
+                        ""_id"": {keySelectorScript},
+                        ""{GroupHelper.GroupElements}"":{{""$push"":{elementSelectorScript}}},
                     }}
                 }}
                 ";
@@ -284,8 +284,8 @@ namespace MongoLinqs.Pipelines
                 var result = new SelectorBuilder(resultSelector).Build();
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
-                var temp = GroupHelper.GroupElements;
-                var script = $@"
+                var temp = NameHelper.GetTempField();
+                _steps.Add($@"
                 {{
                     ""$lookup"": {{
                         ""from"": ""{attached}"",
@@ -294,9 +294,24 @@ namespace MongoLinqs.Pipelines
                         ""as"": ""{temp}""
                     }}
                 }}
-                ";
-                _steps.Add(script);
-                _steps.Add($"{{\"$project\":{result.Script}}}");
+                ");
+                _steps.Add($@"
+                {{
+                    ""$project"": {{
+                        ""_id"": false,
+                        ""{first}"": ""$$ROOT"",
+                        ""{second}"": ""${temp}""
+                    }}
+                }}
+                ");
+                _steps.Add($@"
+                {{
+                    ""$project"": {{
+                        ""{first}.{temp}"": false                     
+                    }}
+                }}
+                ");
+                _steps.Add($"{{\"$project\":{result}}}");
             }
             else
             {
@@ -311,34 +326,21 @@ namespace MongoLinqs.Pipelines
             var selector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
             var selectorBuilder = new SelectorBuilder(selector);
             var result = selectorBuilder.Build();
-            if (result.Kind == SelectorResultKind.Root)
+            if (result == "$$ROOT")
             {
                 return;
             }
 
-            if (result.Kind == SelectorResultKind.Member)
+            if (result.StartsWith("{"))
             {
-                var temp = $"f_{Guid.NewGuid():n}";
-                _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
+                _steps.Add($"{{\"$project\":{result}}}");
+            }
+            else
+            {
+                var temp = NameHelper.GetTempField();
+                _steps.Add($"{{\"$project\":{{\"{temp}\":{result}}}}}");
                 _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
-                return;
             }
-
-            if (result.Kind == SelectorResultKind.Constant)
-            {
-                var temp = $"f_{Guid.NewGuid():n}";
-                _steps.Add($"{{\"$project\":{{\"{temp}\":{result.Script}}}}}");
-                _steps.Add($"{{\"$replaceRoot\":{{\"newRoot\":\"${temp}\"}}}}");
-                return;
-            }
-
-            if (result.Kind == SelectorResultKind.New)
-            {
-                _steps.Add($"{{\"$project\":{result.Script}}}");
-                return;
-            }
-
-            throw BuildException(node);
         }
 
 
@@ -366,7 +368,7 @@ namespace MongoLinqs.Pipelines
         }
 
 
-        public MongoPipelineResult Build()
+        public PipelineResult Build()
         {
             var pipeline = $"[{string.Join(",", _steps)}]";
             pipeline = FormatPipeline(pipeline);
@@ -374,7 +376,7 @@ namespace MongoLinqs.Pipelines
             _logger.WriteLine("Pipe line:");
             _logger.WriteLine(pipeline);
             _logger.WriteLine();
-            return new MongoPipelineResult()
+            return new PipelineResult()
             {
                 StartAt = _startAt,
                 Pipeline = pipeline,

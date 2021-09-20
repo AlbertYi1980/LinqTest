@@ -1,20 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Text.RegularExpressions;
-using MongoLinqs.Pipelines.MemberPath;
+using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 
 namespace MongoLinqs.Pipelines.Conditions
 {
     public class ConditionBuilder
     {
-
-        private readonly Expression _param;
+        private readonly IList<Expression> _params;
         private readonly Expression _body;
+
         public ConditionBuilder(LambdaExpression lambda)
         {
-            _param = lambda.Parameters[0];
+            _params = lambda.Parameters.Cast<Expression>().ToList();
             _body = lambda.Body;
         }
 
@@ -113,7 +115,7 @@ namespace MongoLinqs.Pipelines.Conditions
         private string VisitProperty(Expression node)
         {
             var member = node as MemberExpression;
-            return $"\"{MemberAccessHelper.GetPath(member, _param)}\"";
+            return $"\"{PathAccessHelper.GetPath(member, _params)}\"";
         }
 
         private string VisitSpecialCondition(Expression node)

@@ -44,7 +44,7 @@ namespace MongoLinqs
             if (typeof(TResult).GetGenericTypeDefinition() == typeof(IEnumerable<>))
             {
                 var elementType = typeof(TResult).GenericTypeArguments.First();
-                var pipelineGenerator = new MongoPipelineGenerator(_logger);
+                var pipelineGenerator = new PipelineGenerator(_logger);
                 pipelineGenerator.Visit(expression);   
                 var pipelineResult = pipelineGenerator.Build();
                 var collection = GetCollection(pipelineResult.StartAt);

@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Linq.Expressions;
 
-namespace MongoLinqs.Pipelines.Grouping
+namespace MongoLinqs.Pipelines.Utils
 {
     public static class GroupHelper
     {
@@ -33,6 +33,13 @@ namespace MongoLinqs.Pipelines.Grouping
         public static bool IsGroupMember(MemberExpression member)
         {
             var type = member.Expression!.Type;
+            if (!type.IsGenericType) return false;
+            return type.GetGenericTypeDefinition() == typeof(IGrouping<,>);
+        }
+        
+        public static bool IsGroup(Expression expression)
+        {
+            var type = expression.Type;
             if (!type.IsGenericType) return false;
             return type.GetGenericTypeDefinition() == typeof(IGrouping<,>);
         }

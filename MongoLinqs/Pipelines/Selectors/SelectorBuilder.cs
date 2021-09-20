@@ -2,8 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using MongoLinqs.Pipelines.Grouping;
-using MongoLinqs.Pipelines.MemberPath;
+using MongoLinqs.Pipelines.AgMethods;
+using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 
 namespace MongoLinqs.Pipelines.Selectors
@@ -11,144 +11,80 @@ namespace MongoLinqs.Pipelines.Selectors
     public class SelectorBuilder
     {
         private readonly Expression _body;
-        private readonly Expression _param;
+        private readonly IList<Expression> _params;
 
         public SelectorBuilder(LambdaExpression selector)
         {
             _body = selector.Body;
-            _param = selector.Parameters[0];
+            _params = selector.Parameters.Cast<Expression>().ToList();
         }
 
-        public SelectorResult Build()
+        public string Build()
         {
             return BuildCore(_body);
         }
 
-        private SelectorResult BuildCore(Expression current)
+        private string BuildCore(Expression current)
         {
-            if (_param == current)
+            switch (current)
             {
-                return new SelectorResult
-                {
-                    Kind = SelectorResultKind.Root,
-                    Script = "\"$$ROOT\""
-                };
+                case ParameterExpression:
+                case MemberExpression:
+                    return $"\"${PathAccessHelper.GetPath(current, _params)}\"";
+                case NewExpression:
+                case MemberInitExpression:
+                    return BuildNew(current);
+                case ConstantExpression constant:
+                    return JsonConvert.SerializeObject(constant.Value);
+                case MethodCallExpression call:
+                    if (!AgHelper.IsAggregating(call)) throw new NotSupportedException();
+                    return AgHelper.BuildFunctions(call, _params);
+                default: throw new NotSupportedException();
+            }
+        }
+
+        private int GetNewLength(Expression expression)
+        {
+            if (expression is NewExpression @new)
+            {
+                return @new.Constructor!.GetParameters().Length;
             }
 
-            if (current is MemberExpression member)
+            if (expression is MemberInitExpression memberInit)
             {
-                return new SelectorResult
-                {
-                    Kind = SelectorResultKind.Member,
-                    Script = BuildMember(member)
-                };
-            }
-
-            if (current is NewExpression @new)
-            {
-                return new SelectorResult
-                {
-                    Kind = SelectorResultKind.New,
-                    Script = BuildNew(@new)
-                };
-            }
-
-            if (current is MemberInitExpression memberInit)
-            {
-                return new SelectorResult
-                {
-                    Kind = SelectorResultKind.New,
-                    Script = BuildMemberInit(memberInit)
-                };
-            }
-
-            if (current is ConstantExpression constant)
-            {
-                return new SelectorResult
-                {
-                    Kind = SelectorResultKind.Constant,
-                    Script = JsonConvert.SerializeObject(constant.Value)
-                };
-            }
-
-            if (current is MethodCallExpression call)
-            {
-                if (!GroupHelper.IsGroupCall(call) && !GroupHelper.IsEnumCall(call))
-                {
-                    throw new NotSupportedException();
-                }
-
-                if (call.Method.Name == nameof(Enumerable.Count))
-                {
-                    return new SelectorResult()
-                    {
-                        Kind = SelectorResultKind.Member,
-                        Script = $"{{\"$size\":\"${GroupHelper.GroupElements}\"}}"
-                    };
-                }
-
-                if (call.Method.Name == nameof(Enumerable.Average))
-                {
-                    if (call.Arguments.Count == 1)
-                    {
-                        return new SelectorResult()
-                        {
-                            Kind = SelectorResultKind.Member,
-                            Script = $"{{\"$avg\":\"${GroupHelper.GroupElements}\"}}"
-                        };
-                    }
-                    else
-                    {
-                        var lambda = call.Arguments[1] as LambdaExpression;
-                        var path = MemberAccessHelper.GetPath(lambda.Body as MemberExpression, lambda.Parameters[0]);
-                        return new SelectorResult()
-                        {
-                            Kind = SelectorResultKind.Member,
-                            Script = $"{{\"$avg\":\"${GroupHelper.GroupElements}.{path}\"}}"
-                        };
-                    }
-                }
-                else
-                {
-                    throw new NotSupportedException();
-                }
+                return memberInit.Bindings.Count;
             }
 
             throw new NotSupportedException();
         }
 
-
-        private string BuildMember(MemberExpression member)
+        private string BuildNew(Expression expression)
         {
-            return $"\"${MemberAccessHelper.GetPath(member, _param)}\"";
-            ;
-        }
-
-        private string BuildNew(NewExpression @new)
-        {
-            var length = @new!.Constructor!.GetParameters().Length;
+            var length = GetNewLength(expression);
             var members = new List<string>();
             for (var i = 0; i < length; i++)
             {
-                var name = NameHelper.ToCamelCase(@new.Members![i].Name);
-                var value = BuildCore(@new.Arguments[i]).Script;
-                var member = $"\"{name}\":{value}";
-                members.Add(member);
-            }
+                string name;
+                string value;
 
-            return $"{{{string.Join(",", members)}}}";
-        }
+                if (expression is NewExpression @new)
+                {
+                    name = NameHelper.ToCamelCase(@new.Members![i].Name);
+                    value = BuildCore(@new.Arguments[i]);
+                }
+                else if (expression is MemberInitExpression memberInit)
+                {
+                    var assignment = (MemberAssignment) memberInit.Bindings[i];
 
-        private string BuildMemberInit(MemberInitExpression memberInit)
-        {
-            var length = memberInit!.Bindings!.Count;
-            var members = new List<string>();
-            for (var i = 0; i < length; i++)
-            {
-                var assignment = (MemberAssignment) memberInit.Bindings[i];
-                var name = NameHelper.ToCamelCase(assignment.Member.Name);
-                var result = BuildCore(assignment.Expression);
-                var value = result.Script;
+                    name = NameHelper.ToCamelCase(assignment.Member.Name);
+
+                    value = BuildCore(assignment.Expression);
+                }
+                else
+                {
+                    throw new NotSupportedException();
+                }
+
                 var member = $"\"{name}\":{value}";
                 members.Add(member);
             }

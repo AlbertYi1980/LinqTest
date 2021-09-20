@@ -1,7 +1,7 @@
 ﻿using MongoLinqs;
 using Xunit.Abstractions;
 
-namespace MongoLinq.Tests
+namespace MongoLinq.Tests.Common
 {
     public class TestLogger : ILogger
     {
