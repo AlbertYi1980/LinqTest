@@ -1,5 +1,6 @@
 using System.Linq;
 using MongoLinq.Tests.Common;
+using MongoLinq.Tests.Entities;
 using Newtonsoft.Json;
 using Xunit;
 using Xunit.Abstractions;

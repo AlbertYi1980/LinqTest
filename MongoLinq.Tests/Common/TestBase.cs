@@ -1,4 +1,5 @@
 ﻿using System;
+using MongoLinq.Tests.Entities;
 using MongoLinqs;
 using Xunit.Abstractions;
 

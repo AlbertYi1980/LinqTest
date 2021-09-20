@@ -1,4 +1,4 @@
-﻿namespace MongoLinq.Tests.Common
+﻿namespace MongoLinq.Tests.Entities
 {
     public class Student
     {
