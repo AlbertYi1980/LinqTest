@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 
-namespace MongoLinqs.Pipelines.Conditions
+namespace MongoLinqs.Pipelines
 {
     public class ConditionBuilder
     {

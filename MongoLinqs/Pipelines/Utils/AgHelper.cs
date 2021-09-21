@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using MongoLinqs.Pipelines.Utils;
 
-namespace MongoLinqs.Pipelines.AgMethods
+namespace MongoLinqs.Pipelines.Utils
 {
     public static class AgHelper
     {

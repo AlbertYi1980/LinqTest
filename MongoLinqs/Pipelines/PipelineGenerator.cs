@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
-using MongoLinqs.Pipelines.Conditions;
-using MongoLinqs.Pipelines.Selectors;
 using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -159,13 +157,13 @@ namespace MongoLinqs.Pipelines
                 var attached = NameHelper.MapCollection(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
          
-                var outerKey =new SelectorBuilder(outerKeySelector,false).Build();
+                var outerKey =new LambdaBodyBuilder(outerKeySelector!.Body,outerKeySelector.Parameters.Count > 1,false).Build();
                   
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = new SelectorBuilder(innerKeySelector, false).Build();
+                var innerKey = new LambdaBodyBuilder(innerKeySelector!.Body, innerKeySelector.Parameters.Count > 1,false).Build();
           
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
-                var resultSelectorScript = new SelectorBuilder(resultSelector).Build();
+                var resultSelectorScript = new LambdaBodyBuilder(resultSelector!.Body, resultSelector.Parameters.Count > 1).Build();
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
                 var temp = NameHelper.GetTempField();
@@ -221,7 +219,7 @@ namespace MongoLinqs.Pipelines
                 var source = node.Arguments[0];
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-                var keySelectorScript = new SelectorBuilder(keySelector).Build();
+                var keySelectorScript = new LambdaBodyBuilder(keySelector!.Body, keySelector.Parameters.Count > 1).Build();
 
 
                 var script = $@"
@@ -240,8 +238,8 @@ namespace MongoLinqs.Pipelines
                 Visit(source);
                 var keySelector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
                 var elementSelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
-                var keySelectorScript = new SelectorBuilder(keySelector).Build();
-                var elementSelectorScript = new SelectorBuilder(elementSelector).Build();
+                var keySelectorScript = new LambdaBodyBuilder(keySelector!.Body, keySelector.Parameters.Count > 1).Build();
+                var elementSelectorScript = new LambdaBodyBuilder(elementSelector!.Body, elementSelector.Parameters.Count > 1).Build();
 
                 var script = $@"
                 {{
@@ -285,7 +283,7 @@ namespace MongoLinqs.Pipelines
                 var innerKey =
                     NameHelper.MapMember((innerKeySelector!.Body as MemberExpression)!.Member);
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
-                var result = new SelectorBuilder(resultSelector).Build();
+                var result = new LambdaBodyBuilder(resultSelector!.Body, resultSelector.Parameters.Count > 1).Build();
                 var first = resultSelector!.Parameters[0].Name;
                 var second = resultSelector.Parameters[1].Name;
                 var temp = NameHelper.GetTempField();
@@ -328,7 +326,7 @@ namespace MongoLinqs.Pipelines
             var source = node.Arguments[0];
             Visit(source);
             var selector = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
-            var selectorBuilder = new SelectorBuilder(selector);
+            var selectorBuilder = new LambdaBodyBuilder(selector!.Body, selector.Parameters.Count > 1);
             var result = selectorBuilder.Build();
             if (result == "$$ROOT")
             {
