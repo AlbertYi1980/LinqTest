@@ -15,12 +15,57 @@ namespace MongoLinq.Tests
         {
         }
 
-
+        
         [Fact]
         public void Where()
         {
             var q = from s in StudentSet
                 where s.Id == 2 && s.Name.Contains("bb") && s.Name == "bbb"
+                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+
+        [Fact]
+        public void WhereEqual()
+        {
+            var q = from s in StudentSet
+                where s.Id == 2 
+                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void WhereNotEqual()
+        {
+            var q = from s in StudentSet
+                where  s.Name != "bbb"
+                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void WhereStringContains()
+        {
+            var q = from s in StudentSet
+                where  s.Name.Contains("bb")
                 select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
 
             var list = q.ToList();

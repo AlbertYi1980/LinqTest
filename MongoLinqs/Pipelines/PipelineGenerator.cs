@@ -157,10 +157,10 @@ namespace MongoLinqs.Pipelines
                 var attached = NameHelper.MapCollection(inner.Type.GenericTypeArguments[0].Name);
                 var outerKeySelector = (node.Arguments[2] as UnaryExpression)!.Operand as LambdaExpression;
          
-                var outerKey =new LambdaBodyBuilder(outerKeySelector!.Body,outerKeySelector.Parameters.Count > 1,false).Build();
+                var outerKey =new LambdaBodyBuilder(outerKeySelector!.Body,outerKeySelector.Parameters.Count > 1).Build(false);
                   
                 var innerKeySelector = (node.Arguments[3] as UnaryExpression)!.Operand as LambdaExpression;
-                var innerKey = new LambdaBodyBuilder(innerKeySelector!.Body, innerKeySelector.Parameters.Count > 1,false).Build();
+                var innerKey = new LambdaBodyBuilder(innerKeySelector!.Body, innerKeySelector.Parameters.Count > 1).Build(false);
           
                 var resultSelector = (node.Arguments[4] as UnaryExpression)!.Operand as LambdaExpression;
                 var resultSelectorScript = new LambdaBodyBuilder(resultSelector!.Body, resultSelector.Parameters.Count > 1).Build();
@@ -363,7 +363,7 @@ namespace MongoLinqs.Pipelines
             builder.Append("\"$match\":");
             var lambda = (node.Arguments[1] as UnaryExpression)!.Operand as LambdaExpression;
 
-            var result = new ConditionBuilder(lambda).Build();
+            var result = new LambdaBodyBuilder(lambda!.Body, lambda.Parameters.Count > 1).Build(true, true);
             builder.Append(result);
             builder.Append("}");
             _steps.Add(builder.ToString());

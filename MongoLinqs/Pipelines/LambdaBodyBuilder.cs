@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Text;
+using System.Text.RegularExpressions;
 using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 
@@ -8,29 +10,28 @@ namespace MongoLinqs.Pipelines
 {
     public class LambdaBodyBuilder
     {
-        private readonly bool _isRef;
+      
         private readonly Expression _body;
         private readonly bool _multipleParams;
 
-        public LambdaBodyBuilder(Expression body, bool multipleParams, bool isRef = true)
+        public LambdaBodyBuilder(Expression body, bool multipleParams )
         {
-            _isRef = isRef;
             _body = body;
             _multipleParams = multipleParams;
         }
 
-        public string Build()
+        public string Build(bool isRef = true, bool fieldFirst = false )
         {
-            return BuildRecursive(_body);
+            return BuildRecursive(_body, isRef, fieldFirst);
         }
 
-        private string BuildRecursive(Expression current)
+        private string BuildRecursive(Expression current,bool isRef , bool fieldFirst )
         {
             switch (current)
             {
                 case ParameterExpression:
                 case MemberExpression:
-                    var prefix = _isRef ? "$" : string.Empty;
+                    var prefix = isRef ? "$" : string.Empty;
                     return $"\"{prefix}{PathAccessHelper.GetPath(current, _multipleParams)}\"";
                 case NewExpression:
                 case MemberInitExpression:
@@ -38,17 +39,21 @@ namespace MongoLinqs.Pipelines
                 case ConstantExpression constant:
                     return JsonConvert.SerializeObject(constant.Value);
                 case MethodCallExpression call:
+                    if (call.Method.Name == nameof(string.Contains))
+                    {
+                        return BuildStringContains(call);
+                    }
                     if (!AgHelper.IsAggregating(call)) throw new NotSupportedException();
                     return AgHelper.BuildFunctions(call, _multipleParams);
                 case BinaryExpression binary:
                     switch (binary.NodeType)
                     {
                         case ExpressionType.Add:
-                            return BuildBinary(binary, "$add");
+                            return BuildOperatorFirstBinary(binary, "$add", fieldFirst);
                         case ExpressionType.Subtract:
-                            return BuildBinary(binary, "$subtract");
+                            return BuildOperatorFirstBinary(binary, "$subtract", fieldFirst);
                         case ExpressionType.Multiply:
-                            return BuildBinary(binary, "$multiply");
+                            return BuildOperatorFirstBinary(binary, "$multiply", fieldFirst);
                         case ExpressionType.Divide:
                             if (binary.Left.Type == typeof(int) && binary.Right.Type == typeof(int))
                             {
@@ -56,19 +61,47 @@ namespace MongoLinqs.Pipelines
                             }
                             else
                             {
-                                return BuildBinary(binary, "$divide");
+                                return BuildOperatorFirstBinary(binary, "$divide", fieldFirst);
                             }
-                            
+
                         case ExpressionType.Modulo:
-                            return BuildBinary(binary, "$mod");
+                            return BuildOperatorFirstBinary(binary, "$mod", fieldFirst);
+
+                        case ExpressionType.Equal:
+                            if (fieldFirst)
+                            {
+                                return BuildLeftFirstBinary(binary, "$eq");
+                            }
+                            else
+                            {
+                                return BuildOperatorFirstBinary(binary, "$eq", fieldFirst);
+                            }
+
+                        case ExpressionType.NotEqual:
+                            if (fieldFirst)
+                            {
+                                return BuildLeftFirstBinary(binary, "$ne");
+                            }
+                            else
+                            {
+                                return BuildOperatorFirstBinary(binary, "$ne", fieldFirst);
+                            }
+
+                        case ExpressionType.OrElse:
+                            return BuildOperatorFirstBinary(binary, "$or", fieldFirst);
+                        case ExpressionType.AndAlso:
+                            return BuildOperatorFirstBinary(binary, "$and", fieldFirst);
+
                         default:
                             throw new NotSupportedException();
                     }
                 case UnaryExpression unary:
                     switch (unary.NodeType)
                     {
+                        case ExpressionType.Not:
+                            return BuildUnary(unary, "$not");
                         case ExpressionType.Convert:
-                            return BuildRecursive(unary.Operand);
+                            return BuildRecursive(unary.Operand, true, false);
                         default:
                             throw new NotSupportedException();
                     }
@@ -77,18 +110,53 @@ namespace MongoLinqs.Pipelines
             }
         }
 
-        private string BuildBinary(BinaryExpression binary, string @operator)
+        private string BuildOperatorFirstBinary(BinaryExpression binary, string @operator, bool fieldFirst)
         {
-            var left = BuildRecursive(binary.Left);
-            var right = BuildRecursive(binary.Right);
+            fieldFirst = (@operator == "$and" || @operator == "$or") && fieldFirst;
+            var left = BuildRecursive(binary.Left, true, fieldFirst);
+            var right = BuildRecursive(binary.Right, true, fieldFirst);
             return $"{{{@operator}:[{left},{right}]}}";
         }
         
+        private string BuildLeftFirstBinary(BinaryExpression binary, string @operator)
+        {
+            var left = BuildRecursive(binary.Left, false, true);
+            var right = BuildRecursive(binary.Right, true, false);
+            return $"{{{left}:{{{@operator}:{right}}}}}";
+        }
+
+        private string BuildUnary(UnaryExpression unary, string @operator)
+        {
+            var operand = BuildRecursive(unary.Operand, true, false);
+            return $"{{{@operator}:{operand}}}";
+        }
+
         private string BuildIntegerDivide(BinaryExpression binary)
         {
-            var left = BuildRecursive(binary.Left);
-            var right = BuildRecursive(binary.Right);
+            var left = BuildRecursive(binary.Left, true, false);
+            var right = BuildRecursive(binary.Right, true, false);
             return $"{{$toInt:{{$divide:[{{$subtract:[{left},{{$mod:[{left},{right}]}}]}},{right}]}}}}";
+        }
+        
+        private string BuildStringContains(MethodCallExpression call)
+        {
+          
+            var left = call.Object as MemberExpression;
+            var right = call.Arguments[0] as ConstantExpression;
+            if (right!.Value == null) throw new NotSupportedException();
+            if (left!.Type != typeof(string) || right!.Type != typeof(string)) throw new NotSupportedException();
+            if (left.NodeType != ExpressionType.MemberAccess) throw new NotSupportedException();
+            if (right.NodeType != ExpressionType.Constant) throw new NotSupportedException();
+
+            var builder = new StringBuilder();
+
+            builder.Append("{");
+            builder.Append(BuildRecursive(left, false, false));
+            builder.Append(":{\"$regex\":");
+            builder.Append(JsonConvert.ToString($".*{Regex.Escape(right.Value!.ToString()!)}.*"));
+            builder.Append("}");
+            builder.Append("}");
+            return builder.ToString();
         }
 
         private int GetNewLength(Expression expression)
@@ -118,7 +186,7 @@ namespace MongoLinqs.Pipelines
                 if (expression is NewExpression @new)
                 {
                     name = NameHelper.MapMember(@new.Members![i]);
-                    value = BuildRecursive(@new.Arguments[i]);
+                    value = BuildRecursive(@new.Arguments[i], true, false);
                 }
                 else if (expression is MemberInitExpression memberInit)
                 {
@@ -126,7 +194,7 @@ namespace MongoLinqs.Pipelines
 
                     name = NameHelper.MapMember(assignment.Member);
 
-                    value = BuildRecursive(assignment.Expression);
+                    value = BuildRecursive(assignment.Expression, true, false);
                 }
                 else
                 {

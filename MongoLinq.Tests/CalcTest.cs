@@ -103,5 +103,50 @@ namespace MongoLinq.Tests
                 Logger.WriteLine(JsonConvert.SerializeObject(item));
             }
         }
+        
+        [Fact]
+        public void Or()
+        {
+            var q = from s in StudentSet
+                select new {Id = s.Id , IsValid = s.Name == "aaa" || s.Name == "bbb", s.Enabled, s.SchoolId};
+
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void And()
+        {
+            var q = from s in StudentSet
+                select new {Id = s.Id , IsValid = s.Name != "aaa" && s.Name != "bbb", s.Enabled, s.SchoolId};
+
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
+        
+        [Fact]
+        public void Not()
+        {
+            var q = from s in StudentSet
+                select new {Id = s.Id , IsValid = !( s.Name != "aaa" && s.Name != "bbb"), Disabled = !s.Enabled, s.SchoolId};
+
+
+            var list = q.ToList();
+
+            foreach (var item in list)
+            {
+                Logger.WriteLine(JsonConvert.SerializeObject(item));
+            }
+        }
     }
 }

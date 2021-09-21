@@ -35,6 +35,11 @@ namespace MongoLinq.Tests
                 join s2 in StudentSet on s1.Id equals s2.SchoolId
                 where s2.Name != "a"
                 select new {SchoolName = s1.Name, StudentName = s2.Name};
+            
+            
+            var q2 = SchoolSet.Join(StudentSet, s1 => s1.Id, s2 => s2.SchoolId, (s1, s2) => new {s1, s2})
+                .Where(@t => @t.s2.Name != "a")
+                .Select(@t => new {SchoolName = @t.s1.Name, StudentName = @t.s2.Name});
             var list = q.ToList();
             foreach (var item in list)
             {
