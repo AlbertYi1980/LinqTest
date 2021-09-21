@@ -6,7 +6,7 @@ namespace MongoLinqs.Pipelines.Utils
 {
     public static class PathAccessHelper
     {
-        public static string GetPath(Expression path, IList<Expression> @params)
+        public static string GetPath(Expression path, bool multipleParams)
         {
             var list = new List<string>();
             var current = path;
@@ -20,7 +20,7 @@ namespace MongoLinqs.Pipelines.Utils
                 switch (current)
                 {
                     case ParameterExpression leading:
-                        if (@params.Count > 1)
+                        if (multipleParams)
                         {
                             list.Insert(0, leading.Name);
                         }

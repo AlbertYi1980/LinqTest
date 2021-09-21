@@ -115,7 +115,7 @@ namespace MongoLinqs.Pipelines.Conditions
         private string VisitProperty(Expression node)
         {
             var member = node as MemberExpression;
-            return $"\"{PathAccessHelper.GetPath(member, _params)}\"";
+            return $"\"{PathAccessHelper.GetPath(member, _params.Count > 1)}\"";
         }
 
         private string VisitSpecialCondition(Expression node)

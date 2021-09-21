@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using MongoLinqs.Pipelines.AgMethods;
 using MongoLinqs.Pipelines.Utils;
@@ -12,13 +11,13 @@ namespace MongoLinqs.Pipelines.Selectors
     {
         private readonly bool _isRef;
         private readonly Expression _body;
-        private readonly IList<Expression> _params;
+        private readonly bool _multipleParams;
 
         public SelectorBuilder(LambdaExpression selector, bool isRef = true)
         {
             _isRef = isRef;
             _body = selector.Body;
-            _params = selector.Parameters.Cast<Expression>().ToList();
+            _multipleParams = selector.Parameters.Count > 1;
         }
 
         public string Build()
@@ -33,7 +32,7 @@ namespace MongoLinqs.Pipelines.Selectors
                 case ParameterExpression:
                 case MemberExpression:
                     var prefix = _isRef ? "$" : string.Empty;
-                    return $"\"{prefix}{PathAccessHelper.GetPath(current, _params)}\"";
+                    return $"\"{prefix}{PathAccessHelper.GetPath(current, _multipleParams)}\"";
                 case NewExpression:
                 case MemberInitExpression:
                     return BuildNew(current);
@@ -41,7 +40,7 @@ namespace MongoLinqs.Pipelines.Selectors
                     return JsonConvert.SerializeObject(constant.Value);
                 case MethodCallExpression call:
                     if (!AgHelper.IsAggregating(call)) throw new NotSupportedException();
-                    return AgHelper.BuildFunctions(call, _params);
+                    return AgHelper.BuildFunctions(call, _multipleParams);
                  default:
                      throw new NotSupportedException();
             }
