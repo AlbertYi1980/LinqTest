@@ -8,11 +8,12 @@ namespace MongoLinqs
 {
     public class MongoDbSet<TElement> : IQueryable<TElement>
     {
-     
 
+        private readonly MongoWriter _writer;
         public MongoDbSet(string connectionString, string db, ILogger logger)
         {
 
+            _writer = new MongoWriter(connectionString, db);
             Provider = new MongoQueryProvider(connectionString, db, logger);
             Expression = Expression.Constant(this);
         }
@@ -37,5 +38,15 @@ namespace MongoLinqs
         public Type ElementType => typeof(TElement);
         public Expression Expression { get; }
         public IQueryProvider Provider { get; }
+
+        public void Save(TElement element)
+        {
+            _writer.Save<TElement>(element);
+        }
+        
+        public void Delete(object id)
+        {
+            _writer.Delete<TElement>(id);
+        }
     }
 }

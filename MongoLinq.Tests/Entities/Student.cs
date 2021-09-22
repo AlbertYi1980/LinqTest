@@ -1,4 +1,5 @@
-﻿using MongoLinq.Tests.Common;
+﻿using System;
+using MongoLinq.Tests.Common;
 using MongoLinqs;
 
 namespace MongoLinq.Tests.Entities
@@ -14,5 +15,7 @@ namespace MongoLinq.Tests.Entities
         public int Age { get; set; }
 
         public int SchoolId { get; set; }
+        
+        public DateTime CreateAt { get; set; }
     }
 }
