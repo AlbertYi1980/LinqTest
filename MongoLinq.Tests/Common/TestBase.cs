@@ -7,12 +7,14 @@ namespace MongoLinq.Tests.Common
 {
     public abstract class TestBase
     {
+        private readonly ITestOutputHelper _testOutputHelper;
         protected  readonly MongoDbSet<Student> StudentSet;
         protected  readonly MongoDbSet<School> SchoolSet;
         protected   readonly TestLogger Logger;
 
         protected TestBase(ITestOutputHelper testOutputHelper)
         {
+            _testOutputHelper = testOutputHelper;
             var password = "3#yab@c";
             var defaultDb = "local";
             var connectionString =
@@ -22,6 +24,11 @@ namespace MongoLinq.Tests.Common
             var context = new MongoDbContext(connectionString, db, Logger);
             StudentSet = context.Set<Student>();
             SchoolSet = context.Set<School>();
+        }
+
+        protected void WriteLine(string s)
+        {
+            _testOutputHelper.WriteLine(s);
         }
     }
 }

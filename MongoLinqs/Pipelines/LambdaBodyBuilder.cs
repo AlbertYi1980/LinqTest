@@ -10,22 +10,21 @@ namespace MongoLinqs.Pipelines
 {
     public class LambdaBodyBuilder
     {
-      
         private readonly Expression _body;
         private readonly bool _multipleParams;
 
-        public LambdaBodyBuilder(Expression body, bool multipleParams )
+        public LambdaBodyBuilder(Expression body, bool multipleParams)
         {
             _body = body;
             _multipleParams = multipleParams;
         }
 
-        public string Build(bool isRef = true, bool fieldFirst = false )
+        public string Build(bool isRef = true, bool fieldFirst = false)
         {
             return BuildRecursive(_body, isRef, fieldFirst);
         }
 
-        private string BuildRecursive(Expression current,bool isRef , bool fieldFirst )
+        private string BuildRecursive(Expression current, bool isRef, bool fieldFirst)
         {
             switch (current)
             {
@@ -43,6 +42,7 @@ namespace MongoLinqs.Pipelines
                     {
                         return BuildStringContains(call);
                     }
+
                     if (!AgHelper.IsAggregating(call)) throw new NotSupportedException();
                     return AgHelper.BuildFunctions(call, _multipleParams);
                 case BinaryExpression binary:
@@ -117,7 +117,7 @@ namespace MongoLinqs.Pipelines
             var right = BuildRecursive(binary.Right, true, fieldFirst);
             return $"{{{@operator}:[{left},{right}]}}";
         }
-        
+
         private string BuildLeftFirstBinary(BinaryExpression binary, string @operator)
         {
             var left = BuildRecursive(binary.Left, false, true);
@@ -137,10 +137,9 @@ namespace MongoLinqs.Pipelines
             var right = BuildRecursive(binary.Right, true, false);
             return $"{{$toInt:{{$divide:[{{$subtract:[{left},{{$mod:[{left},{right}]}}]}},{right}]}}}}";
         }
-        
+
         private string BuildStringContains(MethodCallExpression call)
         {
-          
             var left = call.Object as MemberExpression;
             var right = call.Arguments[0] as ConstantExpression;
             if (right!.Value == null) throw new NotSupportedException();
