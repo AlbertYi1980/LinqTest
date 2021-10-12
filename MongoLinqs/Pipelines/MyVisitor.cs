@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq.Expressions;
 using System.Text;
-using System.Threading.Tasks.Dataflow;
 using Newtonsoft.Json;
 
 namespace MongoLinqs.Pipelines
@@ -13,9 +12,11 @@ namespace MongoLinqs.Pipelines
         private readonly StringBuilder _builder;
         private readonly List<int> _indexes;
         private string _mainCollection;
+        private bool _inMemberChain;
 
         public MyVisitor(Expression expression)
         {
+            _inMemberChain = false;
             _builder = new StringBuilder();
             _indexes = new List<int>();
             Push();
@@ -47,7 +48,6 @@ namespace MongoLinqs.Pipelines
 
         private static string Format(string json)
         {
-            return json;
             using var stringReader = new StringReader(json);
             using var stringWriter = new StringWriter();
             var jsonReader = new JsonTextReader(stringReader);
@@ -103,7 +103,7 @@ namespace MongoLinqs.Pipelines
                 _builder.Append(",");
             }
 
-            _builder.Append("{$match:{");
+            _builder.Append("{$match:{$expr:");
 
             VisitLambda(GetLambda(node.Arguments[1]));
 
@@ -156,33 +156,79 @@ namespace MongoLinqs.Pipelines
                 case ExpressionType.Equal:
                     VisitEqual((BinaryExpression)expression);
                     break;
+                case ExpressionType.Constant:
+                    VisitConstant((ConstantExpression)expression);
+                    break;
+                case ExpressionType.MemberAccess:
+                    VisitMember((MemberExpression)expression);
+                    break;
+                case ExpressionType.Parameter:
+                    VisitParameter((ParameterExpression)expression);
+                    break;
                 default:
                     _builder.Append("\"*\"");
                     break;
             }
         }
 
+        private void VisitParameter(ParameterExpression expression)
+        {
+            _builder.Append("*");
+        }
+
+        private void VisitMember(MemberExpression expression)
+        {
+            var inMemberChain = _inMemberChain;
+            _inMemberChain = true;
+            if (!inMemberChain)
+            {
+                _builder.Append("\"$");
+            }
+
+            if (expression.Expression!.NodeType == ExpressionType.MemberAccess)
+            {
+                VisitMember((MemberExpression)expression.Expression);
+            }
+            else
+            {
+                _inMemberChain = false;
+                VisitExpression(expression.Expression);
+            }
+            _builder.Append(".");
+            _builder.Append(expression.Member.Name);
+
+            if (!inMemberChain)
+            {
+                _builder.Append("\"");
+            }
+        }
+
+
+        private void VisitConstant(ConstantExpression expression)
+        {
+            _builder.Append(JsonConvert.SerializeObject(expression.Value));
+        }
 
         private void VisitAndAlso(BinaryExpression expression)
         {
-            _builder.Append("{$expr:{");
+            _builder.Append("{");
             _builder.Append("$and:[");
             VisitExpression(expression.Left);
             _builder.Append(",");
             VisitExpression(expression.Right);
             _builder.Append("]");
-            _builder.Append("}}");
+            _builder.Append("}");
         }
-        
+
         private void VisitEqual(BinaryExpression expression)
         {
-            _builder.Append("{$expr:{");
+            _builder.Append("{");
             _builder.Append("$eq:[");
             VisitExpression(expression.Left);
             _builder.Append(",");
             VisitExpression(expression.Right);
             _builder.Append("]");
-            _builder.Append("}}");
+            _builder.Append("}");
         }
 
         #endregion

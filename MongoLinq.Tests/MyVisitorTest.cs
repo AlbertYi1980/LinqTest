@@ -31,7 +31,7 @@ namespace MongoLinq.Tests
 
 
             var foo = new MyVisitor(q.Expression);
-
+            var pipeline = foo.Pipeline;
         }
 
         [Fact]
