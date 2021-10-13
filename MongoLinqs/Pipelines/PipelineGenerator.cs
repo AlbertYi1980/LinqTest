@@ -380,7 +380,7 @@ namespace MongoLinqs.Pipelines
             _logger.WriteLine();
             return new PipelineResult()
             {
-                StartAt = _startAt,
+                Collection = _startAt,
                 Pipeline = pipeline,
             };
         }

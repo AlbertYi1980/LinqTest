@@ -10,27 +10,25 @@ namespace MongoLinq.Tests
 {
     public class MyVisitorTest : TestBase
     {
-       
-
         public MyVisitorTest(ITestOutputHelper testOutputHelper) : base(testOutputHelper)
         {
         }
 
-        
+
         [Fact]
         public void Where()
         {
             var q = from s in StudentSet
-                where s.Id == 2  && s.Name == "bbb"
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+                where s.Id == 2 && s.Name == "bbb"
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
 
-            
+
             var q1 = StudentSet
                 .Where(s => s.Id == 2 && s.Name.Contains("bb") && s.Name == "bbb")
                 .Select(s => new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId });
 
 
-            var foo = new MyVisitor(q.Expression);
+            var foo = new PipelineVisitor(q.Expression);
             var pipeline = foo.Pipeline;
         }
 
@@ -38,30 +36,39 @@ namespace MongoLinq.Tests
         public void WhereEqual()
         {
             var q = from s in StudentSet
-                where s.Id == 2 
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
-
-       
+                where s.Id == 2
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
-        
+
         [Fact]
         public void WhereNotEqual()
         {
             var q = from s in StudentSet
-                where  s.Name != "bbb"
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
-
-         
+                where s.Name != "bbb"
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
         
+        
+        [Fact]
+        public void WhereTrue()
+        {
+            var q = from s in StudentSet
+                where true
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
+        }
+
         [Fact]
         public void WhereStringContains()
         {
             var q = from s in StudentSet
-                where  s.Name.Contains("bb")
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
-
-         
+                where s.Name.Contains("bb")
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
         }
 
         [Fact]
@@ -69,29 +76,29 @@ namespace MongoLinq.Tests
         {
             var q = from s in StudentSet
                 // where  s.Id == 2 && s.Name.Contains("bb") && s.Name == "bbb" 
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
-
+                select new { Id2 = s.Id, s.Name, s.Enabled, s.SchoolId };
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
 
         [Fact]
         public void SelectNewInit()
         {
             var q = from s in StudentSet
-                select new Student() {Id = s.Id, Name = "dd", Enabled = s.Enabled,};
+                select new Student() { Id = s.Id, Name = "dd", Enabled = s.Enabled, };
 
-         
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
 
         [Fact]
         public void SelectNewNull()
         {
             var q = from s in StudentSet
-                select new Student() {Id = s.Id, Name = null, Enabled = s.Enabled,};
-
-         
+                select new Student() { Id = s.Id, Name = null, Enabled = s.Enabled, };
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
-
-      
 
 
         [Fact]
@@ -99,17 +106,16 @@ namespace MongoLinq.Tests
         {
             var q = from s in SchoolSet
                 select s;
-        
-
-          
+            
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
-        
+
         [Fact]
         public void SelectId()
         {
             var q = from s in SchoolSet
                 select s;
-          
         }
 
         [Fact]
@@ -122,12 +128,30 @@ namespace MongoLinq.Tests
             var q2 = SchoolSet.SelectMany(s1 => StudentSet, (s1, s2) => new { s1, s2 })
                 .Where(@t => @t.s2.Name != "a")
                 .Select(@t => @t.s2);
-           
+            
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
         }
-
-       
+        
         [Fact]
         public void SelectMany2()
+        {
+            var q = from s1 in SchoolSet
+                from s2 in StudentSet.Where(k => k.Name != "123")
+                where s2.Name != "a"
+                select s2;
+            
+            var q2 = SchoolSet.SelectMany(s1 => StudentSet.Where(k => k.Name != "123"), (s1, s2) => new { s1, s2 })
+                .Where(@t => @t.s2.Name != "a")
+                .Select(@t => @t.s2);
+     
+            var foo = new PipelineVisitor(q.Expression);
+            var pipeline = foo.Pipeline;
+        }
+
+
+        [Fact]
+        public void SelectMany3()
         {
             var q = from s1 in SchoolSet
                 where s1.Name == "kk"
@@ -138,10 +162,6 @@ namespace MongoLinq.Tests
                 .SelectMany(s1 => StudentSet, (s1, s2) => new { s1, s2 })
                 .Where(@t => @t.s2.Name != "a")
                 .Select(@t => @t.s2);
-           
         }
-       
-       
-      
     }
 }
