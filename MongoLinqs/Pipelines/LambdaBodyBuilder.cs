@@ -33,8 +33,9 @@ namespace MongoLinqs.Pipelines
                     var prefix = isRef ? "$" : string.Empty;
                     return $"\"{prefix}{PathAccessHelper.GetPath(current, _multipleParams)}\"";
                 case NewExpression:
-                case MemberInitExpression:
                     return BuildNew(current);
+                case MemberInitExpression:
+                    return BuildMemberInit(current);
                 case ConstantExpression constant:
                     return JsonConvert.SerializeObject(constant.Value);
                 case MethodCallExpression call:
@@ -158,52 +159,35 @@ namespace MongoLinqs.Pipelines
             return builder.ToString();
         }
 
-        private int GetNewLength(Expression expression)
-        {
-            if (expression is NewExpression @new)
-            {
-                return @new.Constructor!.GetParameters().Length;
-            }
-
-            if (expression is MemberInitExpression memberInit)
-            {
-                return memberInit.Bindings.Count;
-            }
-
-            throw new NotSupportedException();
-        }
-
         private string BuildNew(Expression expression)
         {
-            var length = GetNewLength(expression);
+            var @new = (NewExpression)expression;
+            var length = @new.Constructor!.GetParameters().Length;
             var members = new List<string>();
             for (var i = 0; i < length; i++)
             {
-                string name;
-                string value;
-
-                if (expression is NewExpression @new)
-                {
-                    name = NameHelper.MapMember(@new.Members![i]);
-                    value = BuildRecursive(@new.Arguments[i], true, false);
-                }
-                else if (expression is MemberInitExpression memberInit)
-                {
-                    var assignment = (MemberAssignment) memberInit.Bindings[i];
-
-                    name = NameHelper.MapMember(assignment.Member);
-
-                    value = BuildRecursive(assignment.Expression, true, false);
-                }
-                else
-                {
-                    throw new NotSupportedException();
-                }
-
+                var name = @new.Members![i].Name;
+                var value = BuildRecursive(@new.Arguments[i], true, false);
                 var member = $"\"{name}\":{value}";
                 members.Add(member);
             }
+            members.Add(@"""_id"":false");
+            return $"{{{string.Join(",", members)}}}";
+        }
 
+        private string BuildMemberInit(Expression expression)
+        {
+            var memberInit = (MemberInitExpression)expression;
+            var length = memberInit.Bindings.Count;
+            var members = new List<string>();
+            for (var i = 0; i < length; i++)
+            {
+                var assignment = (MemberAssignment)memberInit.Bindings[i];
+                var name = NameHelper.MapMember(assignment.Member);
+                var value = BuildRecursive(assignment.Expression, true, false);
+                var member = $"\"{name}\":{value}";
+                members.Add(member);
+            }
             return $"{{{string.Join(",", members)}}}";
         }
     }

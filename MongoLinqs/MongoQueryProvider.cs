@@ -89,9 +89,13 @@ namespace MongoLinqs
         {
             foreach (var document in documents)
             {
-                var json = document.ToJson();
+                var element = BsonSerializer.Deserialize<TElement>(document);
+
+                yield return element;
                 
-                yield return JsonConvert.DeserializeObject<TElement>(json, SerializerSettings);
+                // var json = document.ToJson();
+                //
+                // yield return JsonConvert.DeserializeObject<TElement>(json, SerializerSettings);
             }
         }
 

@@ -1,16 +1,30 @@
 ﻿using System;
 using System.Reflection;
+using MongoDB.Bson.Serialization;
 
 namespace MongoLinqs.Pipelines.Utils
 {
     public static class NameHelper
     {
+        public static void Register(Type type)
+        {
+            var map = new BsonClassMap(type);
+            foreach (var property in type.GetProperties())
+            {
+                var propertyName = property.Name;
+                var elementName = propertyName == "Id" ? "_id" : ToCamelCase(propertyName);
+                map.MapProperty(propertyName).SetElementName(elementName);
+            }
+
+            BsonClassMap.RegisterClassMap(map);
+        }
+
         public static string MapEntity(string s)
         {
             if (s == "Id") return "_id";
             return ToCamelCase(s);
         }
-        
+
         public static string MapMember(MemberInfo member)
         {
             var memberName = member.Name;
@@ -20,7 +34,7 @@ namespace MongoLinqs.Pipelines.Utils
             if (isGroupMember && memberName == "Key") return "_id";
             return ToCamelCase(memberName);
         }
-        
+
         public static string MapCollection(string s)
         {
             return ToCamelCase(s);
@@ -38,18 +52,17 @@ namespace MongoLinqs.Pipelines.Utils
             if (s == string.Empty) return s;
             return s.Substring(0, 1).ToLower() + s.Substring(1);
         }
-        
+
         private static string ToPascalCase(string s)
         {
             if (s == null) return null;
             if (s == string.Empty) return s;
             return s.Substring(0, 1).ToUpper() + s.Substring(1);
         }
-        
+
         public static string GetTempField()
         {
             return $"f_{Guid.NewGuid():n}";
         }
-        
     }
 }

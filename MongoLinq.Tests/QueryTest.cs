@@ -81,7 +81,7 @@ namespace MongoLinq.Tests
         {
             var q = from s in StudentSet
                 // where  s.Id == 2 && s.Name.Contains("bb") && s.Name == "bbb" 
-                select new {Id2 = s.Id, s.Name, s.Enabled, s.SchoolId};
+                select new {Id = s.Id, s.Name, s.Enabled, s.SchoolId};
 
             var list = q.ToList();
 
