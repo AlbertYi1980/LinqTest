@@ -1,11 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using MongoLinqs.Pipelines.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 namespace MongoLinqs.Serialization
 {
+    
+    public class CustomContractResolver : DefaultContractResolver
+    {
+        protected override string ResolvePropertyName(string propertyName)
+        {
+           return NameHelper.MapEntity(propertyName);
+        }
+    }
+    
     public class DefaultJsonConverter : JsonConverter
     {
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
@@ -21,6 +32,7 @@ namespace MongoLinqs.Serialization
      
             destination.WriteTo(writer);
         }
+        
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue,
             JsonSerializer serializer)

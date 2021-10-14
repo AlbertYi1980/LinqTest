@@ -10,6 +10,7 @@ using MongoDB.Driver;
 using MongoLinqs.Pipelines;
 using MongoLinqs.Serialization;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Bson;
 using Newtonsoft.Json.Serialization;
 
 namespace MongoLinqs
@@ -45,6 +46,7 @@ namespace MongoLinqs
 
         public object Execute(Expression expression)
         {
+            
             throw new NotImplementedException();
         }
 
@@ -87,7 +89,8 @@ namespace MongoLinqs
         {
             foreach (var document in documents)
             {
-                var json = document.ToString();
+                var json = document.ToJson();
+                
                 yield return JsonConvert.DeserializeObject<TElement>(json, SerializerSettings);
             }
         }
